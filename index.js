@@ -244,9 +244,10 @@ client.on("disconnected", (reason) => {
 
 // -------------------- MESSAGE HANDLER --------------------
 client.on("message", async (msg) => {
+    console.log("📩 Message received:", msg.from, msg.body);
   try {
     // self-chat only
-    if (msg.from !== msg.to) return;
+
     if (!msg.body?.trim()) return;
 
     resetDailyLimitIfNeeded();
@@ -308,7 +309,7 @@ client.on("message", async (msg) => {
           ...new Set(
             rawNumbers
               .map((n) => normalizeNumber(n))
-              .filter((n) => /^\d{11,15}$/.test(n))
+              .filter((n) => /^\+\d{7,15}$/.test(n))
           ),
         ];
 
