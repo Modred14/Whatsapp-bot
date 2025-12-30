@@ -372,13 +372,21 @@ client.on("message", async (msg) => {
 
       case "menu":
         await msg.reply(
-          "*MODRED BOT*\n" +
-            "Available commands:\n" +
-            "start  – initialize bot\n" +
-            "change - Update name\n" +
-            "message <numbers> – send messages\n" +
-            "retry - resend failed messages\n" +
-            "menu – show commands"
+          "🤖 *MODRED BOT* 🤖\n" +
+            "━━━━━━━━━━━━━━━━━━\n\n" +
+            "📌 *Available Commands*\n\n" +
+            "🚀 *start*\n" +
+            "Initialize the bot\n\n" +
+            "✏️ *change*\n" +
+            "Update your name\n\n" +
+            "💬 *message <numbers>*\n" +
+            "Send messages to one or more numbers\n\n" +
+            "🔁 *retry*\n" +
+            "Resend failed messages\n\n" +
+            "📋 *menu*\n" +
+            "Show this menu again\n\n" +
+            "━━━━━━━━━━━━━━━━━━\n" +
+            "⚡ Fast • Simple • Reliable"
         );
         break;
 
