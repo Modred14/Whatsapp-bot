@@ -3,6 +3,9 @@ const qrcode = require("qrcode-terminal");
 const fs = require("fs");
 const path = require("path");
 const generateMessage = require("./paraphrase").default;
+const QRCode = require("qrcode");
+const express = require("express");
+const app = express();
 
 const CONFIG_FILE = path.join(__dirname, "config.json");
 
@@ -10,6 +13,8 @@ const MAX_PER_COMMAND = 15;
 const DAILY_LIMIT = 30;
 const DEFAULT_COUNTRY_CODE = "234";
 const CONCURRENT_LIMIT = 3;
+let latestQR = null;
+
 
 // -------------------- STATE --------------------
 let state = {
@@ -225,7 +230,12 @@ const client = new Client({
   },
 });
 
-client.on("qr", (qr) => qrcode.generate(qr, { small: true }));
+client.on("qr", async (qr) => {
+  latestQR = qr; // store raw QR string
+  qrcode.generate(qr, { small: true }); // keep terminal QR
+
+  console.log("📡 QR updated and available on web");
+});
 client.on("ready", () => {
   console.log("✅ Bot is ready");
   resetDailyLimitIfNeeded();
@@ -256,7 +266,31 @@ client.on("disconnected", (reason) => {
   saveFailedQueue();
   setTimeout(() => process.exit(1), 500); // slight delay to ensure write completes
 });
+app.get("/", async (req, res) => {
+  if (!latestQR) {
+    return res.send("<h2>QR not generated yet. Restart the bot.</h2>");
+  }
 
+  try {
+    const qrImage = await QRCode.toDataURL(latestQR);
+    res.send(`
+      <html>
+        <body style="display:flex;align-items:center;justify-content:center;height:100vh">
+          <div>
+            <h2>Scan WhatsApp QR to use the bot</h2>
+            <img src="${qrImage}" />
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send("Failed to generate QR");
+  }
+});
+
+app.listen(3000, () => {
+  console.log("🌐 QR server running on http://localhost:3000");
+});
 // -------------------- MESSAGE HANDLER --------------------
 client.on("message", async (msg) => {
   console.log("📩 Message received:", msg.from, msg.body);
