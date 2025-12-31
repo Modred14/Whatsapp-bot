@@ -108,30 +108,21 @@ function normalizeNumber(n, defaultCountry = DEFAULT_COUNTRY_CODE) {
 
   // Convert number to string if needed
   n = String(n).trim();
-
-  // Remove all non-digit characters except leading '+'
-  let cleaned = n.startsWith("+")
-    ? "+" + n.slice(1).replace(/\D/g, "")
-    : n.replace(/\D/g, "");
-
-  if (cleaned.startsWith("+")) {
-    // Already in international format
-    if (cleaned.length < 8 || cleaned.length > 16) return null; // + plus 7-15 digits
-    return cleaned;
-  }
-
-  // Handle local numbers starting with 0
-  if (cleaned.startsWith("0") && cleaned.length >= 7) {
-    cleaned = defaultCountry + cleaned.slice(1);
-  }
-  // Prepend country code if missing
-  else if (!cleaned.startsWith(defaultCountry) && cleaned.length >= 7) {
+  let cleaned = "";
+  console.log(n);
+  // If starts with '+', remove '+', spaces, or '-' and use as-is
+  if (n.startsWith("+")) {
+    cleaned = n.replace(/\D/g, "");
+    // remove non-digits for local numbers
+  } else {
+    cleaned = n.replace(/\D/g, "").replace(/^0/, "");
     cleaned = defaultCountry + cleaned;
   }
 
-  if (cleaned.length < 7 || cleaned.length > 15) return null;
+  // Ensure reasonable length
+  if (cleaned.length < 7 || cleaned.length > 16) return null;
 
-  return "+" + cleaned;
+  return cleaned;
 }
 
 // -------------------- SEND WITH RETRY --------------------
@@ -156,24 +147,48 @@ async function sendWithRetry(chatId, message, retries = 3) {
 async function sendToNumber(number) {
   const chatId = `${number}@c.us`;
   try {
-    const exists = await client.isRegisteredUser(chatId);
-    if (!exists) return false;
+    const normalized = normalizeNumber(number);
+    if (!normalized) {
+      console.warn(`[SKIP] Invalid number format: ${number}`);
+      return false;
+    }
+    let exists = false;
+    try {
+      exists = await client.isRegisteredUser(chatId);
+    } catch (err) {
+      console.warn(
+        `[SKIP] Cannot check registration for ${chatId}:`,
+        err.message
+      );
+      return false;
+    }
+    console.log(chatId, "registered?", exists);
+    if (!exists) {
+      console.warn(`[SKIP] Number not registered on WhatsApp: ${chatId}`);
+      return false;
+    }
+    let message = generateMessage(state.USER_NAME);
+
+    if (!message) message = "Hello!"; // fallback if undefined
+    message = String(message); // ensure string
+    console.log(`[SEND] To: ${chatId}, Message:`, message);
 
     await client.sendPresenceAvailable();
     await delay(randomBetween(1000, 3000));
-    await client.sendTyping(chatId);
-    await delay(randomBetween(1000, 2000));
-
-    await sendWithRetry(chatId, generateMessage(state.USER_NAME));
+    await sendWithRetry(chatId, message);
 
     state.messageSentToday++;
     saveConfig();
+    console.log(`[SUCCESS] Message sent to ${chatId}`);
     return true;
   } catch (err) {
     console.error(
       `[${new Date().toISOString()}] Failed for ${number}: ${err.message}`
     );
-    failedQueue.push({ number, message: generateMessage(state.USER_NAME) });
+    let failedMessage = generateMessage(state.USER_NAME);
+    if (!failedMessage) failedMessage = "Hello!";
+    failedQueue.push({ number, message: String(failedMessage) });
+
     return false;
   }
 }
@@ -244,7 +259,7 @@ client.on("disconnected", (reason) => {
 
 // -------------------- MESSAGE HANDLER --------------------
 client.on("message", async (msg) => {
-    console.log("📩 Message received:", msg.from, msg.body);
+  console.log("📩 Message received:", msg.from, msg.body);
   try {
     // self-chat only
 
@@ -258,25 +273,27 @@ client.on("message", async (msg) => {
     // ---------------- NAME FLOW ----------------
     if (state.awaitingName) {
       if (!/^[a-zA-Z \-']{2,30}$/.test(text)) {
-        await msg.reply("Invalid name. Letters only.");
+        await msg.reply("Invalid name. Kindly input letters only.");
         return;
       }
 
       state.USER_NAME = text;
       state.awaitingName = false;
       saveConfig();
-      await msg.reply(`Nice to meet you, ${state.USER_NAME}.`);
+      await msg.reply(
+        `Ok then, I will call you *${state.USER_NAME}* from now on.`
+      );
       return;
     }
 
     // ---------------- COMMANDS ----------------
     switch (cmd) {
       case "start":
-        await msg.reply("👋 Hello World");
+        await msg.reply("👋 Hello World ...");
 
         if (state.USER_NAME) {
           await msg.reply(
-            `Already set as *${state.USER_NAME}*\nReply *change* to update.`
+            `Hello *${state.USER_NAME}*\nHow can I help you today?`
           );
           return;
         }
@@ -295,39 +312,41 @@ client.on("message", async (msg) => {
 
       case "message": {
         if (!state.USER_NAME) {
-          await msg.reply("Reply *start* first.");
+          await msg.reply(
+            "Oops! The bot is not active yet. Kindly reply with *start* to activate it."
+          );
           return;
         }
 
         const rawNumbers = text
           .slice(cmd.length)
-          .split(/[, ]+/)
-          .map((n) => n.trim())
+          .trim()
+          .split(/[\s,]+/)
           .filter(Boolean);
+        const normalizedResults = rawNumbers.map((n) => normalizeNumber(n));
+        const numbers = [...new Set(normalizedResults.filter(Boolean))];
+        const invalidNumbers = rawNumbers.filter(
+          (_, i) => !normalizedResults[i]
+        );
 
-        const numbers = [
-          ...new Set(
-            rawNumbers
-              .map((n) => normalizeNumber(n))
-              .filter((n) => /^\+\d{7,15}$/.test(n))
-          ),
-        ];
-
-        if (!numbers.length) {
-          await msg.reply("No valid numbers detected.");
-          return;
+        if (invalidNumbers.length) {
+          await msg.reply(
+            `⚠️ Some numbers are invalid and won't be sent:\n${invalidNumbers.join(
+              ", "
+            )}`
+          );
         }
 
         if (numbers.length > MAX_PER_COMMAND) {
-          await msg.reply(`Max ${MAX_PER_COMMAND} numbers per command.`);
+          await msg.reply(
+            `Unfortunately, you have a limit of ${MAX_PER_COMMAND} numbers per command.`
+          );
           return;
         }
 
         if (state.messageSentToday + numbers.length > DAILY_LIMIT) {
           await msg.reply(
-            `Daily limit reached. Remaining: ${
-              DAILY_LIMIT - state.messageSentToday
-            }`
+            `Oops, you have reached your daily limit for today. Please try again tomorrow.`
           );
           return;
         }
@@ -341,7 +360,7 @@ client.on("message", async (msg) => {
         sent = result.sent;
         failed = result.failed;
         await msg.reply(
-          `Done.\nSent: ${sent}\nFailed: ${failed}\nToday: ${state.messageSentToday}/${DAILY_LIMIT}`
+          `✅Done.\nSent: ${sent}\nFailed: ${failed}\nTotal messages sent today: ${state.messageSentToday}/${DAILY_LIMIT}`
         );
         break;
       }
@@ -365,11 +384,18 @@ client.on("message", async (msg) => {
         }
 
         await msg.reply(
-          `Retry done.\nSent: ${sent}\nFailed: ${failed}\nToday: ${state.messageSentToday}/${DAILY_LIMIT}`
+          `✅Retry complete.\nSent: ${sent}\nFailed: ${failed}\nTotal messages sent today: ${state.messageSentToday}/${DAILY_LIMIT}`
         );
         saveFailedQueue();
         break;
       }
+      case "owner":
+        await msg.reply(
+          "👤 About the Bot Owner\n\n" +
+            "*Modred* is a Full Stack Web Developer, skilled in the MERN stack. His portfolio is available at https://favouromirin.netlify.app.\n\n" +
+            "For inquiries or support, he can be reached via WhatsApp at +23279566275 or email at favourdomirin@gmail.com."
+        );
+        break;
 
       case "menu":
         await msg.reply(
@@ -377,22 +403,27 @@ client.on("message", async (msg) => {
             "━━━━━━━━━━━━━━━━━━\n\n" +
             "📌 *Available Commands*\n\n" +
             "🚀 *start*\n" +
-            "Initialize the bot\n\n" +
+            "• Initialize the bot\n\n" +
             "✏️ *change*\n" +
-            "Update your name\n\n" +
+            "• Update your name\n\n" +
             "💬 *message <numbers>*\n" +
-            "Send messages to one or more numbers\n\n" +
+            "• Send messages to one or more numbers\n" +
+            "• Usage: message 090123456789, 08123456789\n\n" +
             "🔁 *retry*\n" +
-            "Resend failed messages\n\n" +
+            "• Resend failed messages\n\n" +
             "📋 *menu*\n" +
-            "Show this menu again\n\n" +
+            "• Show this menu again\n\n" +
+            "👤 *owner*\n" +
+            "• About the bot owner\n" +
             "━━━━━━━━━━━━━━━━━━\n" +
             "⚡ Fast • Simple • Reliable"
         );
         break;
 
       default:
-        await msg.reply("Unknown command. Type *menu*.");
+        await msg.reply(
+          "❌ Unknown command. Reply with *menu* to see all available commands."
+        );
     }
   } catch (err) {
     console.error("Fatal handler error:", err);

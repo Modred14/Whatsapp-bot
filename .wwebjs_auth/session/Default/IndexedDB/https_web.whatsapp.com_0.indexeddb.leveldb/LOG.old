@@ -1,23 +1,15 @@
-2025/12/30-15:21:39.926 85e4 Reusing MANIFEST C:\Users\omiri\Desktop\Coding\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/12/30-15:21:39.926 85e4 Recovering log #133
-2025/12/30-15:21:39.954 85e4 Reusing old log C:\Users\omiri\Desktop\Coding\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000133.log 
-2025/12/30-15:21:42.083 2f30 Level-0 table #138: started
-2025/12/30-15:21:42.090 2f30 Level-0 table #138: 219726 bytes OK
-2025/12/30-15:21:42.091 2f30 Delete type=0 #133
-2025/12/30-15:21:42.091 2f30 Manual compaction at level-0 from '\x00=\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00>\x00\x00\x00' @ 0 : 0; will stop at '\x00>\x00\x00\x05' @ 94026 : 1
-2025/12/30-15:21:42.092 2f30 Compacting 1@0 + 1@1 files
-2025/12/30-15:21:42.140 2f30 Generated table #139@0: 39553 keys, 726804 bytes
-2025/12/30-15:21:42.140 2f30 Compacted 1@0 + 1@1 files => 726804 bytes
-2025/12/30-15:21:42.140 2f30 compacted to: files[ 0 1 1 0 0 0 0 ]
-2025/12/30-15:21:42.141 2f30 Manual compaction at level-0 from '\x00>\x00\x00\x05' @ 94026 : 1 .. '\x00>\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/12/30-15:21:42.141 2f30 Level-0 table #141: started
-2025/12/30-15:21:42.143 2f30 Level-0 table #141: 248 bytes OK
-2025/12/30-15:21:42.144 2f30 Delete type=0 #137
-2025/12/30-15:21:42.145 2f30 Manual compaction at level-0 from '\x00>\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00?\x00\x00\x00' @ 0 : 0; will stop at '\x00>\x00\x00\x05' @ 94059 : 0
-2025/12/30-15:21:42.145 2f30 Compacting 1@0 + 1@1 files
-2025/12/30-15:21:42.187 2f30 Generated table #142@0: 39559 keys, 726881 bytes
-2025/12/30-15:21:42.187 2f30 Compacted 1@0 + 1@1 files => 726881 bytes
-2025/12/30-15:21:42.188 2f30 compacted to: files[ 0 1 1 0 0 0 0 ]
-2025/12/30-15:21:42.188 2f30 Delete type=2 #135
-2025/12/30-15:21:42.188 2f30 Delete type=2 #138
-2025/12/30-15:21:42.189 2f30 Manual compaction at level-0 from '\x00>\x00\x00\x05' @ 94059 : 0 .. '\x00?\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/30-19:21:04.827 6d14 Reusing MANIFEST C:\Users\omiri\Desktop\Coding\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/30-19:21:04.827 6d14 Recovering log #317
+2025/12/30-19:21:04.855 6d14 Reusing old log C:\Users\omiri\Desktop\Coding\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000317.log 
+2025/12/30-19:21:06.810 b14 Level-0 table #323: started
+2025/12/30-19:21:06.821 b14 Level-0 table #323: 361576 bytes OK
+2025/12/30-19:21:06.823 b14 Delete type=0 #317
+2025/12/30-19:21:06.823 b14 Manual compaction at level-0 from '\x00w\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00x\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/30-19:21:06.887 b14 Compacting 1@1 + 2@2 files
+2025/12/30-19:21:06.965 b14 Generated table #324@1: 85358 keys, 2253115 bytes
+2025/12/30-19:21:07.004 b14 Generated table #325@1: 19658 keys, 1668993 bytes
+2025/12/30-19:21:07.004 b14 Compacted 1@1 + 2@2 files => 3922108 bytes
+2025/12/30-19:21:07.005 b14 compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/12/30-19:21:07.006 b14 Delete type=2 #319
+2025/12/30-19:21:07.006 b14 Delete type=2 #320
+2025/12/30-19:21:07.006 b14 Delete type=2 #323
