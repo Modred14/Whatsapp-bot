@@ -14,7 +14,7 @@ const DAILY_LIMIT = 30;
 const DEFAULT_COUNTRY_CODE = "234";
 const CONCURRENT_LIMIT = 3;
 let latestQR = null;
-
+let onTime;
 
 // -------------------- STATE --------------------
 let state = {
@@ -239,6 +239,7 @@ client.on("qr", async (qr) => {
 client.on("ready", () => {
   console.log("✅ Bot is ready");
   resetDailyLimitIfNeeded();
+  onTime = Date.now();
 
   if (state.awaitingName) {
     console.log("[INFO] Awaiting user name. Please reply with your name.");
@@ -268,7 +269,7 @@ client.on("disconnected", (reason) => {
 });
 app.get("/", async (req, res) => {
   if (!latestQR) {
-    return res.send("<h2>QR not generated yet. Restart the bot.</h2>");
+    return res.send("<h2>QR not generated yet. Please hold.</h2>");
   }
 
   try {
@@ -296,13 +297,17 @@ client.on("message", async (msg) => {
   console.log("📩 Message received:", msg.from, msg.body);
   try {
     // self-chat only
+    // if (!msg.fromMe) return;
 
     if (!msg.body?.trim()) return;
 
     resetDailyLimitIfNeeded();
 
     const text = msg.body.trim();
-    const cmd = text.split(" ")[0].toLowerCase();
+    let cmd = text.split(" ")[0].toLowerCase();
+    if (!cmd.startsWith(".")) {
+      cmd = "." + cmd;
+    }
 
     // ---------------- NAME FLOW ----------------
     if (state.awaitingName) {
@@ -319,10 +324,18 @@ client.on("message", async (msg) => {
       );
       return;
     }
+    const startTime = onTime;
+    const getUptime = () => {
+      const s = Math.floor((Date.now() - startTime) / 1000);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return `${h}h ${m}m ${sec}s`;
+    };
 
     // ---------------- COMMANDS ----------------
     switch (cmd) {
-      case "start":
+      case ".start":
         await msg.reply("👋 Hello World ...");
 
         if (state.USER_NAME) {
@@ -337,17 +350,17 @@ client.on("message", async (msg) => {
         await msg.reply("What’s your name?");
         break;
 
-      case "change":
+      case ".change":
         state.USER_NAME = null;
         state.awaitingName = true;
         saveConfig();
         await msg.reply("What’s your new name?");
         break;
 
-      case "message": {
+      case ".message": {
         if (!state.USER_NAME) {
           await msg.reply(
-            "Oops! The bot is not active yet. Kindly reply with *start* to activate it."
+            "Oops! The bot is not active yet. Kindly reply with *.start* to activate it."
           );
           return;
         }
@@ -398,7 +411,7 @@ client.on("message", async (msg) => {
         );
         break;
       }
-      case "retry": {
+      case ".retry": {
         if (!failedQueue.length) {
           await msg.reply("No failed messages to retry.");
           return;
@@ -423,40 +436,210 @@ client.on("message", async (msg) => {
         saveFailedQueue();
         break;
       }
-      case "owner":
+      case ".explain":
+        {
+          let command = text.slice(cmd.length).trim();
+          if (!command.startsWith(".")) {
+            return (command = "." + command);
+          }
+
+          switch (command) {
+            case ".start": {
+              await msg.reply(
+                "👋 Initializes the bot and sets the user name if not already set."
+              );
+              break;
+            }
+            case ".change name": {
+              await msg.reply(
+                "✏️ Updates or changes the user name in the bot system."
+              );
+              break;
+            }
+            case ".menu": {
+              await msg.reply("📜 Displays all available commands.");
+              break;
+            }
+            case ".owner": {
+              await msg.reply("👤 Information about the bot owner.");
+              break;
+            }
+            case ".explain": {
+              await msg.reply(
+                "💡 Provides explanations for each command. Can specify a command like *.explain <command>*."
+              );
+              break;
+            }
+            case ".joke": {
+              await msg.reply("😂 Provides a humorous joke to make you laugh.");
+              break;
+            }
+            case ".message": {
+              await msg.reply(
+                "📩 Sends a message via the bot number using the user’s name. Can specify recipients or quantity using *.message <number>*."
+              );
+              break;
+            }
+            case ".retry": {
+              await msg.reply(
+                "🔄 Retries sending messages that failed previously."
+              );
+              break;
+            }
+            default: {
+              await msg.reply(
+                "❌ Unknown command. Type *.menu* to see all commands."
+              );
+            }
+          }
+        }
+        break;
+      case ".owner":
         await msg.reply(
           "👤 About the Bot Owner\n\n" +
             "*Modred* is a Full Stack Web Developer, skilled in the MERN stack. His portfolio is available at https://favouromirin.netlify.app.\n\n" +
             "For inquiries or support, he can be reached via WhatsApp at +23279566275 or email at favourdomirin@gmail.com."
         );
         break;
+      case ".jokes":
+        {
+          const jokes = [
+            {
+              joke: "What do you call fake spaghetti?",
+              answer: "An impasta 🍝😜",
+            },
+            {
+              joke: "What do you call an alligator in a vest?",
+              answer: " An investigator 🐊🕵️‍♂️🤣",
+            },
+            {
+              joke: "How do cows stay up to date?",
+              answer: "They read the moos-paper 🐄📰😂",
+            },
+            {
+              joke: "What’s brown and sticky?",
+              answer: "A stick 🌳🤣",
+            },
+            {
+              joke: "Why did the banana go to the doctor?",
+              answer: "It wasn’t peeling well 🍌😷😂",
+            },
+            {
+              joke: "Why did the coffee file a police report?",
+              answer: "It got mugged",
+            },
+            {
+              joke: "Why did the math book look sad?",
+              answer: "Too many problems",
+            },
+            {
+              joke: "What’s orange and sounds like a parrot?",
+              answer: "A carrot",
+            },
+            {
+              joke: "Why did the computer catch a cold?",
+              answer: "It left its Windows open 💻❄️😂",
+            },
+            {
+              joke: "Why don’t skeletons fight?",
+              answer: "They don’t have the guts 💀🤣",
+            },
+            {
+              joke: "Why did the coffee file a police report?",
+              answer: "It got mugged ☕🚨😂",
+            },
 
-      case "menu":
+            {
+              joke: "Why did the calendar feel scared?",
+              answer: "Its days were numbered 📆😨😂",
+            },
+            {
+              joke: "Why did the gamer bring a ladder?",
+              answer: "To reach the next level 🎮🪜😂",
+            },
+            {
+              joke: "Why did the alarm clock get punched?",
+              answer: "It woke up the wrong person ⏰😡😂",
+            },
+            {
+              joke: "No laughter detected. Please update your humor 😭😂",
+              answer: "❌ Error 404: Humor not found 💀😂",
+            },
+            {
+              joke: "Why did hunger attack at night?",
+              answer: "Because food tastes better after 12am 🍕😈😂",
+            },
+            {
+              joke: "Why did the calendar laugh?",
+              answer: "Because I said 'next year will be better' 📆🤣",
+            },
+            {
+              joke: "Why did the bed look happy?",
+              answer: "It finally saw me coming 🛏️😍🤣",
+            },
+            {
+              joke: "Why did the skeleton go to the party alone?",
+              answer: "He had no body to go with 💀🎉🤣",
+            },
+            {
+              joke: "Why don’t ants get sick?",
+              answer: "Because they have tiny anty-bodies 🐜💪😂",
+            },
+            {
+              joke: "Data bundle in Nigeria is like Avatar",
+              answer: "It disappears when you need it the most 📶😭",
+            },
+            {
+              joke: "What do you call a guy who’s really loud?",
+              answer: "Mike 🎤😂",
+            },
+          ];
+          const sendJoke = jokes[Math.floor(Math.random() * jokes.length)];
+          await msg.reply(`${sendJoke.joke}`);
+          await delay(500);
+          if (sendJoke.answer) {
+            await msg.reply(`${sendJoke.answer}`);
+          }
+        }
+        break;
+      case ".rizz":
+        const rizzs = [
+          "",
+          "",
+
+        ];
+      case ".menu":
         await msg.reply(
-          "🤖 *MODRED BOT* 🤖\n" +
-            "━━━━━━━━━━━━━━━━━━\n\n" +
-            "📌 *Available Commands*\n\n" +
-            "🚀 *start*\n" +
-            "• Initialize the bot\n\n" +
-            "✏️ *change*\n" +
-            "• Update your name\n\n" +
-            "💬 *message <numbers>*\n" +
-            "• Send messages to one or more numbers\n" +
-            "• Usage: message 090123456789, 08123456789\n\n" +
-            "🔁 *retry*\n" +
-            "• Resend failed messages\n\n" +
-            "📋 *menu*\n" +
-            "• Show this menu again\n\n" +
-            "👤 *owner*\n" +
-            "• About the bot owner\n" +
-            "━━━━━━━━━━━━━━━━━━\n" +
+          "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
+            `║ \n` +
+            `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
+            "║ ✫⚙️ *Commands:* 9           \n" +
+            "║ ✫🌟 *Version:* 1.0.0        \n" +
+            "║ ✫🛠️ *Owner:* Modred         \n" +
+            "╚══════════════╝\n\n\n" +
+            " *Available Commands:* \n" +
+            "╔══════════════╗\n" +
+            "║ 📌 *General Commands:*       \n" +
+            "║   ✫🚀 .start                \n" +
+            "║   ✫✏️ .change name          \n" +
+            "║   ✫📋 .menu                 \n" +
+            "║   ✫👤 .owner                \n" +
+            "║   ✫💡 .explain <command>    \n" +
+            "║   ✫😂 .joke\n" +
+            "║   ✫🥰 .rizz\n" +
+            "╚══════════════╝\n\n" +
+            "╔══════════════╗\n" +
+            "║ 💬 *Message Commands:*       \n" +
+            "║   ✫💬 .message <nums>       \n" +
+            "║   ✫🔁 .retry                \n" +
+            "╚══════════════╝\n\n" +
             "⚡ Fast • Simple • Reliable"
         );
         break;
 
       default:
         await msg.reply(
-          "❌ Unknown command. Reply with *menu* to see all available commands."
+          "❌ Unknown command. Reply with *.menu* to see all available commands."
         );
     }
   } catch (err) {
