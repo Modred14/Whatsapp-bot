@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require("whatsapp-web.js");
+const { Client, LocalAuth, sendContact } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const fs = require("fs");
 const path = require("path");
@@ -15,16 +15,43 @@ const DEFAULT_COUNTRY_CODE = "234";
 const CONCURRENT_LIMIT = 3;
 let latestQR = null;
 let onTime;
-
+let version = "v1.0.0";
+const OWNER_NUMBER = "23279566275@c.us";
+let customMessage = "";
 // -------------------- STATE --------------------
 let state = {
-  USER_NAME: null,
-  messageSentToday: 0,
-  lastSentDate: null,
-  awaitingName: false,
+  users: {},
 };
+let failedMessages = [];
+let sentMessages = [];
 
-const failedQueue = [];
+function getUser(chatId) {
+  if (!state.users[chatId]) {
+    state.users[chatId] = {
+      USER_NAME: null,
+      awaitingName: false,
+      messageSentToday: 0,
+      lastSentDate: today(),
+      failedMessages: [],
+      awaitingCustomConfirm: false,
+      awaitingCustomMessage: false,
+      sentMessages: [],
+    };
+    saveConfig();
+  }
+  return state.users[chatId];
+}
+async function tagEveryone(msg, text) {
+  const chat = await msg.getChat();
+  if (!chat.isGroup) {
+    await msg.reply(text);
+  } else {
+    const mentions = chat.participants
+      .filter((p) => p.id.user !== client.info?.me?.user)
+      .map((p) => p.id._serialized);
+    await chat.sendMessage(`${text}`, { mentions });
+  }
+}
 
 // -------------------- UTILS --------------------
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -37,31 +64,34 @@ const today = () =>
 
 // -------------------- CONFIG VALIDATION --------------------
 function validateConfig(data) {
-  return (
-    typeof data === "object" &&
-    (data.USER_NAME === null || typeof data.USER_NAME === "string") &&
-    typeof data.messageSentToday === "number" &&
-    (data.lastSentDate === null || typeof data.lastSentDate === "string") &&
-    typeof data.awaitingName === "boolean"
-  );
-}
-function saveFailedQueue() {
-  fs.promises
-    .writeFile(
-      path.join(__dirname, "failedQueue.json"),
-      JSON.stringify(failedQueue, null, 2)
-    )
-    .catch((err) => console.error("FailedQueue save failed:", err.message));
+  if (!data || typeof data !== "object") return false;
+  if (!data.users || typeof data.users !== "object") return false;
+
+  for (const user of Object.values(data.users)) {
+    if (
+      typeof user.messageSentToday !== "number" ||
+      typeof user.awaitingName !== "boolean" ||
+      typeof user.lastSentDate !== "string"
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
-function loadFailedQueue() {
-  const file = path.join(__dirname, "failedQueue.json");
-  if (!fs.existsSync(file)) return;
-  try {
-    const data = JSON.parse(fs.readFileSync(file, "utf8"));
-    if (Array.isArray(data)) failedQueue.push(...data);
-  } catch (err) {
-    console.error("FailedQueue load failed:", err.message);
+function persistState() {
+  state.failedMessages = failedMessages;
+  saveConfig();
+}
+
+function saveFailedQueue(number, message) {
+  failedMessages.push({ number, message });
+  saveConfig();
+}
+
+function loadFailedQueue(user) {
+  if (Array.isArray(state.failedMessages)) {
+    failedMessages.push(...state.failedMessages);
   }
 }
 
@@ -96,10 +126,12 @@ function saveConfig() {
   }, 400);
 }
 
-function resetDailyLimitIfNeeded() {
-  if (state.lastSentDate !== today()) {
-    state.messageSentToday = 0;
-    state.lastSentDate = today();
+function resetDailyLimitIfNeeded(user) {
+  if (!user) return;
+
+  if (user.lastSentDate !== today()) {
+    user.messageSentToday = 0;
+    user.lastSentDate = today();
     saveConfig();
   }
 }
@@ -149,7 +181,11 @@ async function sendWithRetry(chatId, message, retries = 3) {
   }
 }
 
-async function sendToNumber(number) {
+async function sendToNumber(number, user) {
+  if (!user || typeof user !== "object") {
+    console.error("[FATAL] sendToNumber called without user:", number);
+    return false;
+  }
   const chatId = `${number}@c.us`;
   try {
     const normalized = normalizeNumber(number);
@@ -172,7 +208,7 @@ async function sendToNumber(number) {
       console.warn(`[SKIP] Number not registered on WhatsApp: ${chatId}`);
       return false;
     }
-    let message = generateMessage(state.USER_NAME);
+    let message = customMessage || generateMessage(user.USER_NAME);
 
     if (!message) message = "Hello!"; // fallback if undefined
     message = String(message); // ensure string
@@ -182,7 +218,7 @@ async function sendToNumber(number) {
     await delay(randomBetween(1000, 3000));
     await sendWithRetry(chatId, message);
 
-    state.messageSentToday++;
+    user.messageSentToday++;
     saveConfig();
     console.log(`[SUCCESS] Message sent to ${chatId}`);
     return true;
@@ -190,15 +226,15 @@ async function sendToNumber(number) {
     console.error(
       `[${new Date().toISOString()}] Failed for ${number}: ${err.message}`
     );
-    let failedMessage = generateMessage(state.USER_NAME);
-    if (!failedMessage) failedMessage = "Hello!";
-    failedQueue.push({ number, message: String(failedMessage) });
+    let failedMessage = generateMessage(user.USER_NAME);
+    saveFailedQueue(number, failedMessage);
 
     return false;
   }
 }
 
-async function sendMessages(numbers) {
+async function sendMessages(numbers, user) {
+  if (!user) throw new Error("sendMessages called without user");
   let sent = 0;
   let failed = 0;
 
@@ -209,7 +245,7 @@ async function sendMessages(numbers) {
     .map(async () => {
       while (queue.length) {
         const number = queue.shift();
-        const success = await sendToNumber(number);
+        const success = await sendToNumber(number, user);
         if (success) sent++;
         else failed++;
         await delay(randomBetween(5000, 15000));
@@ -217,7 +253,6 @@ async function sendMessages(numbers) {
     });
 
   await Promise.all(workers);
-  saveFailedQueue();
   return { sent, failed };
 }
 
@@ -237,9 +272,9 @@ client.on("qr", async (qr) => {
   console.log("📡 QR updated and available on web");
 });
 client.on("ready", () => {
-  console.log("✅ Bot is ready");
-  resetDailyLimitIfNeeded();
   onTime = Date.now();
+  console.log("✅ Bot is ready");
+  resetDailyLimitIfNeeded(user);
 
   if (state.awaitingName) {
     console.log("[INFO] Awaiting user name. Please reply with your name.");
@@ -249,13 +284,14 @@ client.on("ready", () => {
 process.on("uncaughtException", (err) => {
   console.error("❌ Uncaught exception:", err);
   saveConfig(); // make sure state is saved
-  saveFailedQueue();
+  persistState();
 });
 
 process.on("SIGINT", () => {
   console.log("❌ Bot shutting down...");
   saveConfig();
-  saveFailedQueue();
+  persistState();
+
   process.exit();
 });
 
@@ -264,7 +300,8 @@ client.on("auth_failure", (msg) => console.error("❌ Auth failure:", msg));
 client.on("disconnected", (reason) => {
   console.error("❌ Disconnected:", reason);
   saveConfig(); // <--- save state before exit
-  saveFailedQueue();
+  persistState();
+
   setTimeout(() => process.exit(1), 500); // slight delay to ensure write completes
 });
 app.get("/", async (req, res) => {
@@ -298,10 +335,15 @@ client.on("message", async (msg) => {
   try {
     // self-chat only
     // if (!msg.fromMe) return;
+    // if(msg.from === OWNER_NUMBER){
+    //   await tagEveryone(msg, "sup owner")
+    // }
+    const isGroup = msg.from.endsWith("@g.us");
+    const chatId = msg.from;
+    const user = getUser(chatId);
 
+    resetDailyLimitIfNeeded(user);
     if (!msg.body?.trim()) return;
-
-    resetDailyLimitIfNeeded();
 
     const text = msg.body.trim();
     let cmd = text.split(" ")[0].toLowerCase();
@@ -310,20 +352,74 @@ client.on("message", async (msg) => {
     }
 
     // ---------------- NAME FLOW ----------------
-    if (state.awaitingName) {
+    if (user.awaitingName) {
       if (!/^[a-zA-Z \-']{2,30}$/.test(text)) {
-        await msg.reply("Invalid name. Kindly input letters only.");
+        await tagEveryone(msg, "Invalid name. Kindly input letters only.");
         return;
       }
 
-      state.USER_NAME = text;
-      state.awaitingName = false;
+      user.USER_NAME = text;
+      user.awaitingName = false;
       saveConfig();
-      await msg.reply(
-        `Ok then, I will call you *${state.USER_NAME}* from now on.`
+
+      await tagEveryone(
+        msg,
+        `Ok then, I will call you *${user.USER_NAME}* from now on.`
       );
       return;
     }
+    if (user.awaitingCustomConfirm) {
+      const answer = text.toLowerCase();
+
+      if (answer === "yes") {
+        user.awaitingCustomConfirm = false;
+        user.awaitingCustomMessage = true;
+        saveConfig();
+
+        await tagEveryone(msg, "✍️ Send the custom message now.");
+        return;
+      }
+
+      if (answer === "no") {
+        user.awaitingCustomConfirm = false;
+        saveConfig();
+
+        await tagEveryone(msg, "🚀 Sending default message...");
+        const result = await sendMessages(user.pendingNumbers, user);
+
+        user.pendingNumbers = [];
+        saveConfig();
+
+        await tagEveryone(
+          msg,
+          `✅ Done.\nSent: ${result.sent}\nFailed: ${result.failed}`
+        );
+        return;
+      }
+
+      await tagEveryone(msg, "❌ Reply only with *yes* or *no*.");
+      return;
+    }
+    if (user.awaitingCustomMessage) {
+      customMessage = text;
+
+      user.awaitingCustomMessage = false;
+      saveConfig();
+
+      await tagEveryone(msg, "🚀 Sending your custom message...");
+      const result = await sendMessages(user.pendingNumbers, user);
+
+      user.pendingNumbers = [];
+      saveConfig();
+
+      await tagEveryone(
+        msg,
+        `✅ Done.\nSent: ${result.sent}\nFailed: ${result.failed}`
+      );
+      customMessage = ""
+      return;
+    }
+
     const startTime = onTime;
     const getUptime = () => {
       const s = Math.floor((Date.now() - startTime) / 1000);
@@ -332,35 +428,46 @@ client.on("message", async (msg) => {
       const sec = s % 60;
       return `${h}h ${m}m ${sec}s`;
     };
-
+    const getSpeed = async () => {
+      const start = process.hrtime.bigint();
+      await msg.getChat();
+      const end = process.hrtime.bigint();
+      return `${(Number(end - start) / 1_000_000).toFixed(2)} ms`;
+    };
     // ---------------- COMMANDS ----------------
     switch (cmd) {
       case ".start":
-        await msg.reply("👋 Hello World ...");
+        await tagEveryone(msg, "👋 Hello World ...");
 
-        if (state.USER_NAME) {
-          await msg.reply(
-            `Hello *${state.USER_NAME}*\nHow can I help you today?`
+        if (user.USER_NAME) {
+          await tagEveryone(
+            msg,
+            `Hello *${user.USER_NAME}*\nHow can I help you today?`
           );
           return;
         }
 
-        state.awaitingName = true;
+        user.awaitingName = true;
         saveConfig();
-        await msg.reply("What’s your name?");
+        await tagEveryone(
+          msg,
+          "🤖 Welcome to ӍØĐⱤɆĐ ɃØŦ!\n\nBefore we get started, what should I call you?"
+        );
+
         break;
 
-      case ".change":
-        state.USER_NAME = null;
-        state.awaitingName = true;
+      case ".change name":
+        user.USER_NAME = null;
+        user.awaitingName = true;
         saveConfig();
-        await msg.reply("What’s your new name?");
+        await tagEveryone(msg, "What’s your new name?");
         break;
 
       case ".message": {
-        if (!state.USER_NAME) {
-          await msg.reply(
-            "Oops! The bot is not active yet. Kindly reply with *.start* to activate it."
+        if (msg.from !== OWNER_NUMBER) {
+          await tagEveryone(
+            msg,
+            "❌Oops! Only the owner of this bot can use this command."
           );
           return;
         }
@@ -372,122 +479,151 @@ client.on("message", async (msg) => {
           .filter(Boolean);
         const normalizedResults = rawNumbers.map((n) => normalizeNumber(n));
         const numbers = [...new Set(normalizedResults.filter(Boolean))];
-        const invalidNumbers = rawNumbers.filter(
-          (_, i) => !normalizedResults[i]
-        );
-
-        if (invalidNumbers.length) {
-          await msg.reply(
-            `⚠️ Some numbers are invalid and won't be sent:\n${invalidNumbers.join(
-              ", "
-            )}`
-          );
+        if (!numbers.length) {
+          await tagEveryone(msg, "⚠️ No valid numbers provided.");
+          return;
         }
 
         if (numbers.length > MAX_PER_COMMAND) {
-          await msg.reply(
+          await tagEveryone(
+            msg,
             `Unfortunately, you have a limit of ${MAX_PER_COMMAND} numbers per command.`
           );
           return;
         }
 
-        if (state.messageSentToday + numbers.length > DAILY_LIMIT) {
-          await msg.reply(
+        if (user.messageSentToday + numbers.length > DAILY_LIMIT) {
+          await tagEveryone(
+            msg,
             `Oops, you have reached your daily limit for today. Please try again tomorrow.`
           );
           return;
         }
 
-        await msg.reply(`Sending to ${numbers.length} contacts...`);
+        await tagEveryone(msg, `Sending to ${numbers.length} contacts...`);
 
-        let sent = 0;
-        let failed = 0;
+        user.pendingNumbers = numbers;
+        user.awaitingCustomConfirm = true;
+        saveConfig();
 
-        const result = await sendMessages(numbers);
-        sent = result.sent;
-        failed = result.failed;
-        await msg.reply(
-          `✅Done.\nSent: ${sent}\nFailed: ${failed}\nTotal messages sent today: ${state.messageSentToday}/${DAILY_LIMIT}`
+        await tagEveryone(
+          msg,
+          `📨 Preparing to send default message. Do you want to send a *custom message*?\nReply *yes* or *no*."`
         );
+
         break;
       }
       case ".retry": {
-        if (!failedQueue.length) {
-          await msg.reply("No failed messages to retry.");
+        if (!failedMessages.length) {
+          await tagEveryone(msg, "No failed messages to retry.");
           return;
         }
 
-        await msg.reply(`Retrying ${failedQueue.length} failed messages...`);
-        const retryQueue = [...failedQueue];
-        failedQueue.length = 0;
+        await tagEveryone(
+          msg,
+          `Retrying ${failedMessages.length} failed messages...`
+        );
+        const retryQueue = [...failedMessages];
+        failedMessages.length = 0;
 
         let sent = 0;
         let failed = 0;
         for (const f of retryQueue) {
-          const success = await sendToNumber(f.number);
+          const success = await sendToNumber(f.number, user);
           if (success) sent++;
           else failed++;
           await delay(randomBetween(5000, 15000));
         }
 
-        await msg.reply(
-          `✅Retry complete.\nSent: ${sent}\nFailed: ${failed}\nTotal messages sent today: ${state.messageSentToday}/${DAILY_LIMIT}`
+        await tagEveryone(
+          msg,
+          `✅Retry complete.\nSent: ${sent}\nFailed: ${failed}\nTotal messages sent today: ${user.messageSentToday}/${DAILY_LIMIT}`
         );
-        saveFailedQueue();
+
         break;
       }
       case ".explain":
         {
-          let command = text.slice(cmd.length).trim();
-          if (!command.startsWith(".")) {
-            return (command = "." + command);
+          let arg = text.slice(cmd.length).trim(); // get argument after .explain
+          if (!arg) {
+            await tagEveryone(
+              msg,
+              "💡 Usage: *.explain <command>*\nExample: *.explain ping*"
+            );
+            break;
           }
 
-          switch (command) {
+          // ensure it starts with a dot
+          if (!arg.startsWith(".")) arg = "." + arg;
+
+          switch (arg.toLowerCase()) {
+            case ".ping": {
+              await tagEveryone(
+                msg,
+                "📶 Checks if the bot is online and responding. Use this command to see if the bot is active."
+              );
+              break;
+            }
             case ".start": {
-              await msg.reply(
+              await tagEveryone(
+                msg,
                 "👋 Initializes the bot and sets the user name if not already set."
               );
               break;
             }
             case ".change name": {
-              await msg.reply(
+              await tagEveryone(
+                msg,
                 "✏️ Updates or changes the user name in the bot system."
               );
               break;
             }
             case ".menu": {
-              await msg.reply("📜 Displays all available commands.");
+              await tagEveryone(msg, "📜 Displays all available commands.");
               break;
             }
             case ".owner": {
-              await msg.reply("👤 Information about the bot owner.");
+              await tagEveryone(msg, "👤 Information about the bot owner.");
               break;
             }
             case ".explain": {
-              await msg.reply(
+              await tagEveryone(
+                msg,
                 "💡 Provides explanations for each command. Can specify a command like *.explain <command>*."
               );
               break;
             }
             case ".joke": {
-              await msg.reply("😂 Provides a humorous joke to make you laugh.");
+              await tagEveryone(
+                msg,
+                "😂 Provides a humorous joke to make you laugh."
+              );
+              break;
+            }
+            case ".rizz": {
+              await tagEveryone(
+                msg,
+                "💘 Generates smooth, funny, or charming lines you can use to impress someone."
+              );
               break;
             }
             case ".message": {
-              await msg.reply(
+              await tagEveryone(
+                msg,
                 "📩 Sends a message via the bot number using the user’s name. Can specify recipients or quantity using *.message <number>*."
               );
               break;
             }
             case ".retry": {
-              await msg.reply(
+              await tagEveryone(
+                msg,
                 "🔄 Retries sending messages that failed previously."
               );
               break;
             }
             default: {
-              await msg.reply(
+              await tagEveryone(
+                msg,
                 "❌ Unknown command. Type *.menu* to see all commands."
               );
             }
@@ -495,13 +631,50 @@ client.on("message", async (msg) => {
         }
         break;
       case ".owner":
-        await msg.reply(
-          "👤 About the Bot Owner\n\n" +
-            "*Modred* is a Full Stack Web Developer, skilled in the MERN stack. His portfolio is available at https://favouromirin.netlify.app.\n\n" +
-            "For inquiries or support, he can be reached via WhatsApp at +23279566275 or email at favourdomirin@gmail.com."
-        );
+        try {
+          // Send info text first
+          await msg.reply(
+            "👤 *About the Bot Owner*\n\n" +
+              "*Modred* is a Full Stack Web Developer skilled in the MERN stack.\n" +
+              "🌐 Portfolio: https://favouromirin.netlify.app\n\n" +
+              "📞 Contact below:"
+          );
+
+          const numberE164 = "+23279566275";
+          const waid = "23279566275"; // digits only (no +)
+
+          const vcard =
+            "BEGIN:VCARD\n" +
+            "VERSION:3.0\n" +
+            "N:Modred;Modred;;;\n" +
+            "FN:Modred\n" +
+            `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
+            `NOTE:Email: favourdomirin@gmail.com\n` +
+            "END:VCARD";
+
+          await client.sendMessage(msg.from, vcard, { parseVCards: true });
+        } catch (err) {
+          console.error("Failed to send owner info:", err);
+          await msg.reply("⚠️ Could not send contact. Try again later.");
+        }
         break;
-      case ".jokes":
+
+      case ".ping":
+        {
+          const speed = await getSpeed();
+          await tagEveryone(
+            msg,
+            "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
+              `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
+              `║ ✫🚀 *Speed:* ${speed} \n` +
+              "║ ✫🖥️ *Platform:* linux         \n" +
+              `║ ✫🌟 *Version:* ${version}        \n` +
+              `║ ✫🛠️ *Owner:* Modred \n` +
+              "╚══════════════╝"
+          );
+        }
+        break;
+      case ".joke":
         {
           const jokes = [
             {
@@ -526,15 +699,15 @@ client.on("message", async (msg) => {
             },
             {
               joke: "Why did the coffee file a police report?",
-              answer: "It got mugged",
+              answer: "It got mugged☕😂",
             },
             {
               joke: "Why did the math book look sad?",
-              answer: "Too many problems",
+              answer: "Too many problems📚🤣",
             },
             {
               joke: "What’s orange and sounds like a parrot?",
-              answer: "A carrot",
+              answer: "A carrot🥕😂",
             },
             {
               joke: "Why did the computer catch a cold?",
@@ -595,31 +768,34 @@ client.on("message", async (msg) => {
             },
           ];
           const sendJoke = jokes[Math.floor(Math.random() * jokes.length)];
-          await msg.reply(`${sendJoke.joke}`);
-          await delay(500);
-          if (sendJoke.answer) {
-            await msg.reply(`${sendJoke.answer}`);
-          }
+          const answer = sendJoke.answer || "";
+          const jokeMessage = answer
+            ? `${sendJoke.joke}\n\n${answer}`
+            : `${sendJoke.joke}`;
+          await tagEveryone(msg, jokeMessage);
         }
         break;
       case ".rizz":
         const rizzs = [
+          "🌹 Roses are red, 🌸 violets are blue 💙\nI thought God stopped creating angels until I met you 🫶😇",
           "",
-          "",
-
         ];
+        const sendRizz = rizzs[Math.floor(Math.random() * rizzs.length)];
+        await tagEveryone(msg, sendRizz);
+        break;
       case ".menu":
-        await msg.reply(
+        await tagEveryone(
+          msg,
           "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
-            `║ \n` +
             `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
-            "║ ✫⚙️ *Commands:* 9           \n" +
-            "║ ✫🌟 *Version:* 1.0.0        \n" +
-            "║ ✫🛠️ *Owner:* Modred         \n" +
+            "║ ✫⚙️ *Commands:* 10           \n" +
+            `║ ✫🌟 *Version:* ${version}        \n` +
+            `║ ✫🛠️ *Owner:* Modred \n` +
             "╚══════════════╝\n\n\n" +
             " *Available Commands:* \n" +
             "╔══════════════╗\n" +
             "║ 📌 *General Commands:*       \n" +
+            "║   ✫📶 .ping              \n" +
             "║   ✫🚀 .start                \n" +
             "║   ✫✏️ .change name          \n" +
             "║   ✫📋 .menu                 \n" +
@@ -638,13 +814,22 @@ client.on("message", async (msg) => {
         break;
 
       default:
-        await msg.reply(
-          "❌ Unknown command. Reply with *.menu* to see all available commands."
-        );
+        if (isGroup) return;
+        if (user.USER_NAME == null) {
+          await tagEveryone(
+            msg,
+            "Oops! The bot is not active yet. Kindly reply with *.start* to activate it."
+          );
+        } else {
+          await tagEveryone(
+            msg,
+            "❌ Unknown command. Type *.menu* to see all commands."
+          );
+        }
     }
   } catch (err) {
     console.error("Fatal handler error:", err);
-    await msg.reply("An internal error occurred.");
+    await tagEveryone(msg, "An internal error occurred.");
   }
 });
 

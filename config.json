@@ -1,6 +1,26 @@
 {
-  "USER_NAME": "Modred bot",
-  "messageSentToday": 15,
-  "lastSentDate": "2025-12-31",
-  "awaitingName": false
+  "users": {
+    "23279566275@c.us": {
+      "USER_NAME": "Modred",
+      "awaitingName": false,
+      "messageSentToday": 6,
+      "lastSentDate": "2026-01-03",
+      "failedMessage": [],
+      "sentMessage": [],
+      "pendingNumbers": [],
+      "awaitingCustomConfirm": false,
+      "awaitingCustomMessage": false
+    },
+    "status@broadcast": {
+      "USER_NAME": null,
+      "awaitingName": false,
+      "messageSentToday": 0,
+      "lastSentDate": "2026-01-03",
+      "failedMessages": [],
+      "sentMessages": []
+    }
+  },
+  "USER_NAME": null,
+  "awaitingName": true,
+  "failedMessages": []
 }
