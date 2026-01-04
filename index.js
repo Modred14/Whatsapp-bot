@@ -393,22 +393,24 @@ client.on("message", async (msg) => {
     // if (!msg.fromMe) return;
     const isGroup = msg.from.endsWith("@g.us");
     if (!isOwner(msg) && mode === "private") {
-      if (!isGroup){
-        await tagEveryone(msg, 'Oops, the bot is in private mode. Contact my developer to make it public.')
-          const numberE164 = "+23279566275";
-          const waid = "23279566275"; // digits only (no +)
+      await tagEveryone(
+        msg,
+        "Oops, the bot is in private mode. Contact my developer to make it public."
+      );
+      const numberE164 = "+23279566275";
+      const waid = "23279566275"; // digits only (no +)
 
-          const vcard =
-            "BEGIN:VCARD\n" +
-            "VERSION:3.0\n" +
-            "N:Modred;Modred;;;\n" +
-            "FN:Modred\n" +
-            `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
-            `NOTE:Email: favourdomirin@gmail.com\n` +
-            "END:VCARD";
+      const vcard =
+        "BEGIN:VCARD\n" +
+        "VERSION:3.0\n" +
+        "N:Modred;Modred;;;\n" +
+        "FN:Modred\n" +
+        `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
+        `NOTE:Email: favourdomirin@gmail.com\n` +
+        "END:VCARD";
 
-          await client.sendMessage(msg.from, vcard, { parseVCards: true });
-      } return;
+      await client.sendMessage(msg.from, vcard, { parseVCards: true });
+      return;
     }
 
     const chatId = msg.from;
@@ -910,7 +912,7 @@ client.on("message", async (msg) => {
           msg,
           "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
             `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
-            "║ ✫⚙️ *Commands:* 10           \n" +
+            "║ ✫⚙️ *Commands:* 11           \n" +
             `║ ✫🌟 *Version:* ${version}        \n` +
             `║ ✫🛠️ *Developer:* Modred \n` +
             `║ ✫🌐 *Website:* https://favouromirin.netlify.app \n` +
