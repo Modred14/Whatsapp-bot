@@ -3,8 +3,8 @@
     "23279566275@c.us": {
       "USER_NAME": "Modred",
       "awaitingName": false,
-      "messageSentToday": 6,
-      "lastSentDate": "2026-01-03",
+      "messageSentToday": 4,
+      "lastSentDate": "2026-01-04",
       "failedMessage": [],
       "sentMessage": [],
       "pendingNumbers": [],
@@ -15,9 +15,44 @@
       "USER_NAME": null,
       "awaitingName": false,
       "messageSentToday": 0,
-      "lastSentDate": "2026-01-03",
+      "lastSentDate": "2026-01-04",
       "failedMessages": [],
       "sentMessages": []
+    },
+    "120363424356041445@g.us": {
+      "USER_NAME": null,
+      "awaitingName": false,
+      "messageSentToday": 0,
+      "lastSentDate": "2026-01-04",
+      "failedMessages": [],
+      "awaitingCustomConfirm": false,
+      "awaitingCustomMessage": false,
+      "sentMessages": []
+    },
+    "112627447496935@lid": {
+      "USER_NAME": "Damilare",
+      "awaitingName": false,
+      "messageSentToday": 0,
+      "lastSentDate": "2026-01-04",
+      "failedMessages": [],
+      "awaitingCustomConfirm": false,
+      "awaitingCustomMessage": false,
+      "sentMessages": []
+    },
+    "120363401797572401@g.us": {
+      "USER_NAME": null,
+      "awaitingName": false,
+      "messageSentToday": 2,
+      "lastSentDate": "2026-01-04",
+      "failedMessages": [],
+      "awaitingCustomConfirm": false,
+      "awaitingCustomMessage": false,
+      "sentMessages": [],
+      "pendingNumbers": [
+        "2349037981772",
+        "2342348131058431",
+        "2349155608968"
+      ]
     }
   },
   "USER_NAME": null,

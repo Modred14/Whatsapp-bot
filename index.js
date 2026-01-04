@@ -18,10 +18,19 @@ let onTime;
 let version = "v1.0.0";
 const OWNER_NUMBER = "23279566275@c.us";
 let customMessage = "";
+let mode = "private";
 // -------------------- STATE --------------------
 let state = {
   users: {},
 };
+function isOwner(msg) {
+  const sender = msg.author || msg.from;
+  console.log("from:", msg.from, "author:", msg.author);
+
+  return sender === OWNER_NUMBER || sender === "66271613866160@lid";
+}
+
+let isGroup = "";
 let failedMessages = [];
 let sentMessages = [];
 
@@ -41,20 +50,66 @@ function getUser(chatId) {
   }
   return state.users[chatId];
 }
-async function tagEveryone(msg, text) {
-  const chat = await msg.getChat();
-  if (!chat.isGroup) {
-    await msg.reply(text);
-  } else {
-    const mentions = chat.participants
-      .filter((p) => p.id.user !== client.info?.me?.user)
-      .map((p) => p.id._serialized);
-    await chat.sendMessage(`${text}`, { mentions });
-  }
-}
 
 // -------------------- UTILS --------------------
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
+function startTyping(chat, interval = 2000) {
+  let active = true;
+
+  (async () => {
+    while (active) {
+      try {
+        await chat.sendStateTyping();
+        await delay(interval);
+      } catch (err) {
+        // If WhatsApp throws, stop typing to avoid infinite loop
+        active = false;
+      }
+    }
+  })();
+  return async function stopTyping() {
+    active = false;
+    await chat.clearState();
+  };
+}
+
+async function withTyping(chat, workFn, minMs = 1000) {
+  const stopTyping = startTyping(chat);
+  const startTime = Date.now();
+
+  try {
+    const result = await workFn();
+
+    const elapsed = Date.now() - startTime;
+    if (elapsed < minMs) {
+      await delay(minMs - elapsed);
+    }
+
+    return result;
+  } finally {
+    await stopTyping();
+  }
+}
+
+async function tagEveryone(msg, text) {
+  const chat = await msg.getChat();
+
+  await withTyping(
+    chat,
+    async () => {
+      if (!chat.isGroup) {
+        await msg.reply(text);
+      } else {
+        const mentions = chat.participants
+          .filter((p) => p.id.user !== client.info?.me?.user)
+          .map((p) => p.id._serialized);
+        await chat.sendMessage(`${text}`, { mentions });
+      }
+    },
+    1000
+  ); // 👈 minimum typing time = 1 second
+}
 
 const randomBetween = (min, max) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
@@ -332,13 +387,30 @@ app.listen(3000, () => {
 // -------------------- MESSAGE HANDLER --------------------
 client.on("message", async (msg) => {
   console.log("📩 Message received:", msg.from, msg.body);
+
   try {
     // self-chat only
     // if (!msg.fromMe) return;
-    // if(msg.from === OWNER_NUMBER){
-    //   await tagEveryone(msg, "sup owner")
-    // }
     const isGroup = msg.from.endsWith("@g.us");
+    if (!isOwner(msg) && mode === "private") {
+      if (!isGroup){
+        await tagEveryone(msg, 'Oops, the bot is in private mode. Contact my developer to make it public.')
+          const numberE164 = "+23279566275";
+          const waid = "23279566275"; // digits only (no +)
+
+          const vcard =
+            "BEGIN:VCARD\n" +
+            "VERSION:3.0\n" +
+            "N:Modred;Modred;;;\n" +
+            "FN:Modred\n" +
+            `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
+            `NOTE:Email: favourdomirin@gmail.com\n` +
+            "END:VCARD";
+
+          await client.sendMessage(msg.from, vcard, { parseVCards: true });
+      } return;
+    }
+
     const chatId = msg.from;
     const user = getUser(chatId);
 
@@ -416,7 +488,7 @@ client.on("message", async (msg) => {
         msg,
         `✅ Done.\nSent: ${result.sent}\nFailed: ${result.failed}`
       );
-      customMessage = ""
+      customMessage = "";
       return;
     }
 
@@ -435,6 +507,7 @@ client.on("message", async (msg) => {
       return `${(Number(end - start) / 1_000_000).toFixed(2)} ms`;
     };
     // ---------------- COMMANDS ----------------
+
     switch (cmd) {
       case ".start":
         await tagEveryone(msg, "👋 Hello World ...");
@@ -464,10 +537,10 @@ client.on("message", async (msg) => {
         break;
 
       case ".message": {
-        if (msg.from !== OWNER_NUMBER) {
+        if (!isOwner(msg)) {
           await tagEveryone(
             msg,
-            "❌Oops! Only the owner of this bot can use this command."
+            "❌Oops! Only the developer of this bot can use this command."
           );
           return;
         }
@@ -514,6 +587,13 @@ client.on("message", async (msg) => {
         break;
       }
       case ".retry": {
+        if (!isOwner(msg)) {
+          await tagEveryone(
+            msg,
+            "❌Oops! Only the developer of this bot can use this command."
+          );
+          return;
+        }
         if (!failedMessages.length) {
           await tagEveryone(msg, "No failed messages to retry.");
           return;
@@ -582,8 +662,11 @@ client.on("message", async (msg) => {
               await tagEveryone(msg, "📜 Displays all available commands.");
               break;
             }
-            case ".owner": {
-              await tagEveryone(msg, "👤 Information about the bot owner.");
+            case ".developer": {
+              await tagEveryone(
+                msg,
+                "👤 Gives information about the bot developer. Use this command to contact the developer."
+              );
               break;
             }
             case ".explain": {
@@ -621,6 +704,9 @@ client.on("message", async (msg) => {
               );
               break;
             }
+            case ".mode": {
+              await tagEveryone(msg, "📝 Shows the current status of the bot.");
+            }
             default: {
               await tagEveryone(
                 msg,
@@ -630,11 +716,12 @@ client.on("message", async (msg) => {
           }
         }
         break;
-      case ".owner":
+      case ".developer":
         try {
           // Send info text first
-          await msg.reply(
-            "👤 *About the Bot Owner*\n\n" +
+          await tagEveryone(
+            msg,
+            "👤 *About the Bot Developer*\n\n" +
               "*Modred* is a Full Stack Web Developer skilled in the MERN stack.\n" +
               "🌐 Portfolio: https://favouromirin.netlify.app\n\n" +
               "📞 Contact below:"
@@ -654,7 +741,7 @@ client.on("message", async (msg) => {
 
           await client.sendMessage(msg.from, vcard, { parseVCards: true });
         } catch (err) {
-          console.error("Failed to send owner info:", err);
+          console.error("Failed to send developer info:", err);
           await msg.reply("⚠️ Could not send contact. Try again later.");
         }
         break;
@@ -669,7 +756,7 @@ client.on("message", async (msg) => {
               `║ ✫🚀 *Speed:* ${speed} \n` +
               "║ ✫🖥️ *Platform:* linux         \n" +
               `║ ✫🌟 *Version:* ${version}        \n` +
-              `║ ✫🛠️ *Owner:* Modred \n` +
+              `║ ✫🛠️ *Developer:* Modred \n` +
               "╚══════════════╝"
           );
         }
@@ -783,6 +870,41 @@ client.on("message", async (msg) => {
         const sendRizz = rizzs[Math.floor(Math.random() * rizzs.length)];
         await tagEveryone(msg, sendRizz);
         break;
+
+      case ".mode":
+        const [_, arg] = msg.body.trim().split(/\s+/);
+        if (!isOwner(msg)) {
+          await tagEveryone(
+            msg,
+            "❌Oops! Only the developer of this bot can use this command."
+          );
+          return;
+        }
+
+        if (arg === "private") {
+          mode = "private";
+          await tagEveryone(
+            msg,
+            `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.toUpperCase()}*\n📝 Bot ignores all commands not sent by the developer.`
+          );
+          return;
+        }
+        if (arg === "public") {
+          mode = "public";
+          await tagEveryone(
+            msg,
+            `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.toUpperCase()}*\n📝 Bot responds to all commands.`
+          );
+          return;
+        }
+
+        await tagEveryone(
+          msg,
+          `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.toUpperCase()}*`
+        );
+
+        break;
+
       case ".menu":
         await tagEveryone(
           msg,
@@ -790,24 +912,26 @@ client.on("message", async (msg) => {
             `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
             "║ ✫⚙️ *Commands:* 10           \n" +
             `║ ✫🌟 *Version:* ${version}        \n` +
-            `║ ✫🛠️ *Owner:* Modred \n` +
+            `║ ✫🛠️ *Developer:* Modred \n` +
+            `║ ✫🌐 *Website:* https://favouromirin.netlify.app \n` +
             "╚══════════════╝\n\n\n" +
             " *Available Commands:* \n" +
             "╔══════════════╗\n" +
             "║ 📌 *General Commands:*       \n" +
-            "║   ✫📶 .ping              \n" +
+            "║   ✫📶 .ping                 \n" +
             "║   ✫🚀 .start                \n" +
             "║   ✫✏️ .change name          \n" +
             "║   ✫📋 .menu                 \n" +
-            "║   ✫👤 .owner                \n" +
+            "║   ✫👤 .developer                \n" +
             "║   ✫💡 .explain <command>    \n" +
-            "║   ✫😂 .joke\n" +
-            "║   ✫🥰 .rizz\n" +
+            "║   ✫😂 .joke                 \n" +
+            "║   ✫🥰 .rizz                 \n" +
             "╚══════════════╝\n\n" +
             "╔══════════════╗\n" +
-            "║ 💬 *Message Commands:*       \n" +
+            "║ 💬 *Restricted Commands:*    \n" +
             "║   ✫💬 .message <nums>       \n" +
             "║   ✫🔁 .retry                \n" +
+            "║   ✫⚙️ .mode              \n" +
             "╚══════════════╝\n\n" +
             "⚡ Fast • Simple • Reliable"
         );
