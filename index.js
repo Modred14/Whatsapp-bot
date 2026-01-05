@@ -18,7 +18,18 @@ let onTime;
 let version = "v1.0.0";
 const OWNER_NUMBER = "23279566275@c.us";
 let customMessage = "";
-let mode = "private";
+const allMode = {
+  private: {
+    currentMode: "private",
+    responseMode: "📝 Bot ignores all commands not sent by the developer.",
+  },
+  public: {
+    currentMode: "public",
+    responseMode: "📝 Bot responds to all commands.",
+  },
+};
+
+let mode = allMode.private;
 // -------------------- STATE --------------------
 let state = {
   users: {},
@@ -883,26 +894,18 @@ client.on("message", async (msg) => {
           return;
         }
 
-        if (arg === "private") {
-          mode = "private";
+        if (arg === "private" || arg === "public") {
+          mode = allMode[arg];
           await tagEveryone(
             msg,
-            `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.toUpperCase()}*\n📝 Bot ignores all commands not sent by the developer.`
-          );
-          return;
-        }
-        if (arg === "public") {
-          mode = "public";
-          await tagEveryone(
-            msg,
-            `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.toUpperCase()}*\n📝 Bot responds to all commands.`
+            `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.currentMode.toUpperCase()}*\n${mode.responseMode}`
           );
           return;
         }
 
         await tagEveryone(
           msg,
-          `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.toUpperCase()}*`
+          `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.currentMode.toUpperCase()}*\n${mode.responseMode}`
         );
 
         break;

@@ -3,8 +3,8 @@
     "23279566275@c.us": {
       "USER_NAME": "Modred",
       "awaitingName": false,
-      "messageSentToday": 4,
-      "lastSentDate": "2026-01-04",
+      "messageSentToday": 0,
+      "lastSentDate": "2026-01-05",
       "failedMessage": [],
       "sentMessage": [],
       "pendingNumbers": [],
@@ -15,7 +15,7 @@
       "USER_NAME": null,
       "awaitingName": false,
       "messageSentToday": 0,
-      "lastSentDate": "2026-01-04",
+      "lastSentDate": "2026-01-05",
       "failedMessages": [],
       "sentMessages": []
     },
@@ -42,8 +42,8 @@
     "120363401797572401@g.us": {
       "USER_NAME": null,
       "awaitingName": false,
-      "messageSentToday": 2,
-      "lastSentDate": "2026-01-04",
+      "messageSentToday": 0,
+      "lastSentDate": "2026-01-05",
       "failedMessages": [],
       "awaitingCustomConfirm": false,
       "awaitingCustomMessage": false,
