@@ -403,7 +403,7 @@ client.on("message", async (msg) => {
     // self-chat only
     // if (!msg.fromMe) return;
     const isGroup = msg.from.endsWith("@g.us");
-    if (!isOwner(msg) && mode === "private") {
+    if (!isOwner(msg) && allMode.private) {
       await tagEveryone(
         msg,
         "Oops, the bot is in private mode. Contact my developer to make it public."
