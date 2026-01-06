@@ -6,6 +6,7 @@ const generateMessage = require("./paraphrase").default;
 const QRCode = require("qrcode");
 const express = require("express");
 const app = express();
+const aiReply = require("./aireply").default;
 
 const CONFIG_FILE = path.join(__dirname, "config.json");
 
@@ -28,7 +29,67 @@ const allMode = {
     responseMode: "📝 Bot responds to all commands.",
   },
 };
-
+const explain = [
+  {
+    args: ".ping",
+    message:
+      "📶 Checks if the bot is online and responding. \nUse this command to see if the bot is active.",
+  },
+  {
+    args: ".start",
+    message:
+      "👋 Initializes the bot and sets the user name if not already set. \nUse this command to set your user name or intialize the bot.",
+  },
+  {
+    args: ".change name",
+    command: ".change",
+    message:
+      "✏️ Updates or changes the user name in the bot system. \nUse this command to change your user name.",
+  },
+  {
+    args: ".menu",
+    message:
+      "📜 Displays all available commands.\nUse this command to see all available commands.",
+  },
+  {
+    args: ".developer",
+    message:
+      "👤 Gives information about the bot developer. \nUse this command to contact the developer.",
+  },
+  {
+    args: ".explain",
+    message:
+      "💡 Provides explanations for each command. Can specify a command like *.explain <command>*. \nUse this command to get a clear, step-by-step breakdown of what a specific command does.",
+  },
+  {
+    args: ".joke",
+    message:
+      "😂 Provides a humorous joke to make you laugh. \nUse this command to lighten the mood or get a quick laugh anytime.",
+  },
+  {
+    args: ".rizz",
+    message:
+      "💘 Generates smooth, funny, or charming lines you can use to impress someone. \nUse this command to  get creative pick-up lines or playful messages to send to someone you like.",
+  },
+  {
+    args: ".message",
+    message:
+      "📩 Sends a message via the bot number using the user’s name. \nCan specify recipients or quantity using *.message <number>*.",
+  },
+  {
+    args: ".retry",
+    message: "🔄 Retries sending messages that failed previously.",
+  },
+  {
+    args: ".mode",
+    message:
+      "📝 Shows the current status of the bot. \nUse this command to show the bot current mode.",
+  },
+  // {
+  //   args: "",
+  //   message: "",
+  // },
+];
 let mode = allMode.private;
 // -------------------- STATE --------------------
 let state = {
@@ -162,7 +223,97 @@ function loadFailedQueue(user) {
 }
 
 loadFailedQueue();
+const jokes = [
+  {
+    joke: "What do you call fake spaghetti?",
+    answer: "An impasta 🍝😜",
+  },
+  {
+    joke: "What do you call an alligator in a vest?",
+    answer: " An investigator 🐊🕵️‍♂️🤣",
+  },
+  {
+    joke: "How do cows stay up to date?",
+    answer: "They read the moos-paper 🐄📰😂",
+  },
+  {
+    joke: "What’s brown and sticky?",
+    answer: "A stick 🌳🤣",
+  },
+  {
+    joke: "Why did the banana go to the doctor?",
+    answer: "It wasn’t peeling well 🍌😷😂",
+  },
+  {
+    joke: "Why did the coffee file a police report?",
+    answer: "It got mugged☕😂",
+  },
+  {
+    joke: "Why did the math book look sad?",
+    answer: "Too many problems📚🤣",
+  },
+  {
+    joke: "What’s orange and sounds like a parrot?",
+    answer: "A carrot🥕😂",
+  },
+  {
+    joke: "Why did the computer catch a cold?",
+    answer: "It left its Windows open 💻❄️😂",
+  },
+  {
+    joke: "Why don’t skeletons fight?",
+    answer: "They don’t have the guts 💀🤣",
+  },
+  {
+    joke: "Why did the coffee file a police report?",
+    answer: "It got mugged ☕🚨😂",
+  },
 
+  {
+    joke: "Why did the calendar feel scared?",
+    answer: "Its days were numbered 📆😨😂",
+  },
+  {
+    joke: "Why did the gamer bring a ladder?",
+    answer: "To reach the next level 🎮🪜😂",
+  },
+  {
+    joke: "Why did the alarm clock get punched?",
+    answer: "It woke up the wrong person ⏰😡😂",
+  },
+  {
+    joke: "No laughter detected. Please update your humor 😭😂",
+    answer: "❌ Error 404: Humor not found 💀😂",
+  },
+  {
+    joke: "Why did hunger attack at night?",
+    answer: "Because food tastes better after 12am 🍕😈😂",
+  },
+  {
+    joke: "Why did the calendar laugh?",
+    answer: "Because I said 'next year will be better' 📆🤣",
+  },
+  {
+    joke: "Why did the bed look happy?",
+    answer: "It finally saw me coming 🛏️😍🤣",
+  },
+  {
+    joke: "Why did the skeleton go to the party alone?",
+    answer: "He had no body to go with 💀🎉🤣",
+  },
+  {
+    joke: "Why don’t ants get sick?",
+    answer: "Because they have tiny anty-bodies 🐜💪😂",
+  },
+  {
+    joke: "Data bundle in Nigeria is like Avatar",
+    answer: "It disappears when you need it the most 📶😭",
+  },
+  {
+    joke: "What do you call a guy who’s really loud?",
+    answer: "Mike 🎤😂",
+  },
+];
 function loadConfig() {
   if (!fs.existsSync(CONFIG_FILE)) return;
 
@@ -357,7 +508,6 @@ process.on("SIGINT", () => {
   console.log("❌ Bot shutting down...");
   saveConfig();
   persistState();
-
   process.exit();
 });
 
@@ -372,7 +522,9 @@ client.on("disconnected", (reason) => {
 });
 app.get("/", async (req, res) => {
   if (!latestQR) {
-    return res.send("<h2>QR not generated yet. Please hold.</h2>");
+    return res.send(
+      "<h2>QR not generated yet or isLoggedIn. Please hold.</h2>"
+    );
   }
 
   try {
@@ -403,7 +555,7 @@ client.on("message", async (msg) => {
     // self-chat only
     // if (!msg.fromMe) return;
     const isGroup = msg.from.endsWith("@g.us");
-    if (!isOwner(msg) && allMode.private) {
+    if (!isOwner(msg) && mode === allMode.private) {
       await tagEveryone(
         msg,
         "Oops, the bot is in private mode. Contact my developer to make it public."
@@ -419,7 +571,6 @@ client.on("message", async (msg) => {
         `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
         `NOTE:Email: favourdomirin@gmail.com\n` +
         "END:VCARD";
-
       await client.sendMessage(msg.from, vcard, { parseVCards: true });
       return;
     }
@@ -432,9 +583,6 @@ client.on("message", async (msg) => {
 
     const text = msg.body.trim();
     let cmd = text.split(" ")[0].toLowerCase();
-    if (!cmd.startsWith(".")) {
-      cmd = "." + cmd;
-    }
 
     // ---------------- NAME FLOW ----------------
     if (user.awaitingName) {
@@ -520,9 +668,26 @@ client.on("message", async (msg) => {
       return `${(Number(end - start) / 1_000_000).toFixed(2)} ms`;
     };
     // ---------------- COMMANDS ----------------
-
+    if (cmd == "developer") {
+      cmd = "." + cmd;
+    }
     switch (cmd) {
-      case ".start":
+      case explain[0].args:
+        {
+          const speed = await getSpeed();
+          await tagEveryone(
+            msg,
+            "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
+              `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
+              `║ ✫🚀 *Speed:* ${speed} \n` +
+              "║ ✫🖥️ *Platform:* linux         \n" +
+              `║ ✫🌟 *Version:* ${version}        \n` +
+              `║ ✫🛠️ *Developer:* Modred \n` +
+              "╚══════════════╝"
+          );
+        }
+        break;
+      case explain[1].args:
         await tagEveryone(msg, "👋 Hello World ...");
 
         if (user.USER_NAME) {
@@ -542,14 +707,129 @@ client.on("message", async (msg) => {
 
         break;
 
-      case ".change name":
-        user.USER_NAME = null;
-        user.awaitingName = true;
-        saveConfig();
-        await tagEveryone(msg, "What’s your new name?");
+      case explain[2].command:
+        const [__, argu] = msg.body.trim().split(/\s+/);
+        if (argu === "name") {
+          user.USER_NAME = null;
+          user.awaitingName = true;
+          saveConfig();
+          await tagEveryone(msg, "What’s your new name?");
+          return;
+        }
+        await tagEveryone(
+          msg,
+          "❌ Invalid usage. \nCorrect usage: *.change name*"
+        );
+        break;
+      case explain[3].args:
+        await tagEveryone(
+          msg,
+          "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
+            `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
+            `║ ✫⚙️ *Commands:* ${explain.length}           \n` +
+            `║ ✫🌟 *Version:* ${version}        \n` +
+            `║ ✫🛠️ *Developer:* Modred \n` +
+            `║ ✫🌐 *Website:* https://favouromirin.netlify.app \n` +
+            "╚══════════════╝\n\n\n" +
+            " *Available Commands:* \n" +
+            "╔══════════════╗\n" +
+            "║ 📌 *General Commands:*       \n" +
+            `║   ✫📶 ${explain[0].args}                 \n` +
+            `║   ✫🚀 ${explain[1].args}                \n` +
+            `║   ✫✏️ ${explain[2].args}           \n` +
+            `║   ✫📋 ${explain[3].args}                  \n` +
+            `║   ✫👤 ${explain[4].args}                \n` +
+            `║   ✫💡 ${explain[5].args}  <command>    \n` +
+            `║   ✫😂 ${explain[6].args}                  \n` +
+            `║   ✫🥰 ${explain[7].args}                  \n` +
+            "╚══════════════╝\n\n" +
+            "╔══════════════╗\n" +
+            "║ 💬 *Restricted Commands:*    \n" +
+            `║   ✫💬 ${explain[8].args}  <nums>       \n` +
+            `║   ✫🔁 ${explain[9].args}                 \n` +
+            `║   ✫⚙️ ${explain[10].args}              \n` +
+            "╚══════════════╝\n\n" +
+            "⚡ Fast • Simple • Reliable"
+        );
         break;
 
-      case ".message": {
+      case explain[4].args:
+        try {
+          // Send info text first
+          await tagEveryone(
+            msg,
+            "👤 *About the Bot Developer*\n\n" +
+              "*Modred* is a Full Stack Web Developer skilled in the MERN stack.\n" +
+              "🌐 Portfolio: https://favouromirin.netlify.app\n\n" +
+              "📞 Contact below:"
+          );
+
+          const numberE164 = "+23279566275";
+          const waid = "23279566275"; // digits only (no +)
+
+          const vcard =
+            "BEGIN:VCARD\n" +
+            "VERSION:3.0\n" +
+            "N:Modred;Modred;;;\n" +
+            "FN:Modred\n" +
+            `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
+            `NOTE:Email: favourdomirin@gmail.com\n` +
+            "END:VCARD";
+
+          await client.sendMessage(msg.from, vcard, { parseVCards: true });
+        } catch (err) {
+          console.error("Failed to send developer info:", err);
+          await msg.reply("⚠️ Could not send contact. Try again later.");
+        }
+        break;
+      case explain[5].args:
+        {
+          let arg = text.slice(cmd.length).trim(); // get argument after .explain
+          if (!arg.startsWith(".")) {
+            arg = "." + arg;
+          }
+          arg = arg.toLowerCase().replace(/\s+/g, " ").trim();
+          if (!arg) {
+            await tagEveryone(
+              msg,
+              "💡 Usage: *.explain <command>*\nExample: *.explain ping*"
+            );
+            break;
+          }
+          const found = explain.find((item) => {
+            return item.args == arg;
+          });
+          if (!found) {
+            await tagEveryone(
+              msg,
+              "❌ Unknown command. Type *.menu* to see all commands."
+            );
+            break;
+          }
+          await tagEveryone(msg, found.message);
+        }
+
+        break;
+      case explain[6].args:
+        {
+          const sendJoke = jokes[Math.floor(Math.random() * jokes.length)];
+          const answer = sendJoke.answer || "";
+          const jokeMessage = answer
+            ? `${sendJoke.joke}\n\n${answer}`
+            : `${sendJoke.joke}`;
+          await tagEveryone(msg, jokeMessage);
+        }
+        break;
+      case explain[7].args:
+        const rizzs = [
+          "🌹 Roses are red, 🌸 violets are blue 💙\nI thought God stopped creating angels until I met you 🫶😇",
+          "",
+        ];
+        const sendRizz = rizzs[Math.floor(Math.random() * rizzs.length)];
+        await tagEveryone(msg, sendRizz);
+        break;
+
+      case explain[8].args: {
         if (!isOwner(msg)) {
           await tagEveryone(
             msg,
@@ -599,7 +879,7 @@ client.on("message", async (msg) => {
 
         break;
       }
-      case ".retry": {
+      case explain[9].args: {
         if (!isOwner(msg)) {
           await tagEveryone(
             msg,
@@ -635,256 +915,8 @@ client.on("message", async (msg) => {
 
         break;
       }
-      case ".explain":
-        {
-          let arg = text.slice(cmd.length).trim(); // get argument after .explain
-          if (!arg) {
-            await tagEveryone(
-              msg,
-              "💡 Usage: *.explain <command>*\nExample: *.explain ping*"
-            );
-            break;
-          }
 
-          // ensure it starts with a dot
-          if (!arg.startsWith(".")) arg = "." + arg;
-
-          switch (arg.toLowerCase()) {
-            case ".ping": {
-              await tagEveryone(
-                msg,
-                "📶 Checks if the bot is online and responding. Use this command to see if the bot is active."
-              );
-              break;
-            }
-            case ".start": {
-              await tagEveryone(
-                msg,
-                "👋 Initializes the bot and sets the user name if not already set."
-              );
-              break;
-            }
-            case ".change name": {
-              await tagEveryone(
-                msg,
-                "✏️ Updates or changes the user name in the bot system."
-              );
-              break;
-            }
-            case ".menu": {
-              await tagEveryone(msg, "📜 Displays all available commands.");
-              break;
-            }
-            case ".developer": {
-              await tagEveryone(
-                msg,
-                "👤 Gives information about the bot developer. Use this command to contact the developer."
-              );
-              break;
-            }
-            case ".explain": {
-              await tagEveryone(
-                msg,
-                "💡 Provides explanations for each command. Can specify a command like *.explain <command>*."
-              );
-              break;
-            }
-            case ".joke": {
-              await tagEveryone(
-                msg,
-                "😂 Provides a humorous joke to make you laugh."
-              );
-              break;
-            }
-            case ".rizz": {
-              await tagEveryone(
-                msg,
-                "💘 Generates smooth, funny, or charming lines you can use to impress someone."
-              );
-              break;
-            }
-            case ".message": {
-              await tagEveryone(
-                msg,
-                "📩 Sends a message via the bot number using the user’s name. Can specify recipients or quantity using *.message <number>*."
-              );
-              break;
-            }
-            case ".retry": {
-              await tagEveryone(
-                msg,
-                "🔄 Retries sending messages that failed previously."
-              );
-              break;
-            }
-            case ".mode": {
-              await tagEveryone(msg, "📝 Shows the current status of the bot.");
-            }
-            default: {
-              await tagEveryone(
-                msg,
-                "❌ Unknown command. Type *.menu* to see all commands."
-              );
-            }
-          }
-        }
-        break;
-      case ".developer":
-        try {
-          // Send info text first
-          await tagEveryone(
-            msg,
-            "👤 *About the Bot Developer*\n\n" +
-              "*Modred* is a Full Stack Web Developer skilled in the MERN stack.\n" +
-              "🌐 Portfolio: https://favouromirin.netlify.app\n\n" +
-              "📞 Contact below:"
-          );
-
-          const numberE164 = "+23279566275";
-          const waid = "23279566275"; // digits only (no +)
-
-          const vcard =
-            "BEGIN:VCARD\n" +
-            "VERSION:3.0\n" +
-            "N:Modred;Modred;;;\n" +
-            "FN:Modred\n" +
-            `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
-            `NOTE:Email: favourdomirin@gmail.com\n` +
-            "END:VCARD";
-
-          await client.sendMessage(msg.from, vcard, { parseVCards: true });
-        } catch (err) {
-          console.error("Failed to send developer info:", err);
-          await msg.reply("⚠️ Could not send contact. Try again later.");
-        }
-        break;
-
-      case ".ping":
-        {
-          const speed = await getSpeed();
-          await tagEveryone(
-            msg,
-            "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
-              `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
-              `║ ✫🚀 *Speed:* ${speed} \n` +
-              "║ ✫🖥️ *Platform:* linux         \n" +
-              `║ ✫🌟 *Version:* ${version}        \n` +
-              `║ ✫🛠️ *Developer:* Modred \n` +
-              "╚══════════════╝"
-          );
-        }
-        break;
-      case ".joke":
-        {
-          const jokes = [
-            {
-              joke: "What do you call fake spaghetti?",
-              answer: "An impasta 🍝😜",
-            },
-            {
-              joke: "What do you call an alligator in a vest?",
-              answer: " An investigator 🐊🕵️‍♂️🤣",
-            },
-            {
-              joke: "How do cows stay up to date?",
-              answer: "They read the moos-paper 🐄📰😂",
-            },
-            {
-              joke: "What’s brown and sticky?",
-              answer: "A stick 🌳🤣",
-            },
-            {
-              joke: "Why did the banana go to the doctor?",
-              answer: "It wasn’t peeling well 🍌😷😂",
-            },
-            {
-              joke: "Why did the coffee file a police report?",
-              answer: "It got mugged☕😂",
-            },
-            {
-              joke: "Why did the math book look sad?",
-              answer: "Too many problems📚🤣",
-            },
-            {
-              joke: "What’s orange and sounds like a parrot?",
-              answer: "A carrot🥕😂",
-            },
-            {
-              joke: "Why did the computer catch a cold?",
-              answer: "It left its Windows open 💻❄️😂",
-            },
-            {
-              joke: "Why don’t skeletons fight?",
-              answer: "They don’t have the guts 💀🤣",
-            },
-            {
-              joke: "Why did the coffee file a police report?",
-              answer: "It got mugged ☕🚨😂",
-            },
-
-            {
-              joke: "Why did the calendar feel scared?",
-              answer: "Its days were numbered 📆😨😂",
-            },
-            {
-              joke: "Why did the gamer bring a ladder?",
-              answer: "To reach the next level 🎮🪜😂",
-            },
-            {
-              joke: "Why did the alarm clock get punched?",
-              answer: "It woke up the wrong person ⏰😡😂",
-            },
-            {
-              joke: "No laughter detected. Please update your humor 😭😂",
-              answer: "❌ Error 404: Humor not found 💀😂",
-            },
-            {
-              joke: "Why did hunger attack at night?",
-              answer: "Because food tastes better after 12am 🍕😈😂",
-            },
-            {
-              joke: "Why did the calendar laugh?",
-              answer: "Because I said 'next year will be better' 📆🤣",
-            },
-            {
-              joke: "Why did the bed look happy?",
-              answer: "It finally saw me coming 🛏️😍🤣",
-            },
-            {
-              joke: "Why did the skeleton go to the party alone?",
-              answer: "He had no body to go with 💀🎉🤣",
-            },
-            {
-              joke: "Why don’t ants get sick?",
-              answer: "Because they have tiny anty-bodies 🐜💪😂",
-            },
-            {
-              joke: "Data bundle in Nigeria is like Avatar",
-              answer: "It disappears when you need it the most 📶😭",
-            },
-            {
-              joke: "What do you call a guy who’s really loud?",
-              answer: "Mike 🎤😂",
-            },
-          ];
-          const sendJoke = jokes[Math.floor(Math.random() * jokes.length)];
-          const answer = sendJoke.answer || "";
-          const jokeMessage = answer
-            ? `${sendJoke.joke}\n\n${answer}`
-            : `${sendJoke.joke}`;
-          await tagEveryone(msg, jokeMessage);
-        }
-        break;
-      case ".rizz":
-        const rizzs = [
-          "🌹 Roses are red, 🌸 violets are blue 💙\nI thought God stopped creating angels until I met you 🫶😇",
-          "",
-        ];
-        const sendRizz = rizzs[Math.floor(Math.random() * rizzs.length)];
-        await tagEveryone(msg, sendRizz);
-        break;
-
-      case ".mode":
+      case explain[10].args:
         const [_, arg] = msg.body.trim().split(/\s+/);
         if (!isOwner(msg)) {
           await tagEveryone(
@@ -898,48 +930,20 @@ client.on("message", async (msg) => {
           mode = allMode[arg];
           await tagEveryone(
             msg,
-            `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.currentMode.toUpperCase()}*\n${mode.responseMode}`
+            `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.currentMode.toUpperCase()}*\n${
+              mode.responseMode
+            }`
           );
           return;
         }
 
         await tagEveryone(
           msg,
-          `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.currentMode.toUpperCase()}*\n${mode.responseMode}`
+          `🤖 *Bot Mode Status*\n\n✅ Current mode: *${mode.currentMode.toUpperCase()}*\n${
+            mode.responseMode
+          }`
         );
 
-        break;
-
-      case ".menu":
-        await tagEveryone(
-          msg,
-          "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
-            `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
-            "║ ✫⚙️ *Commands:* 11           \n" +
-            `║ ✫🌟 *Version:* ${version}        \n` +
-            `║ ✫🛠️ *Developer:* Modred \n` +
-            `║ ✫🌐 *Website:* https://favouromirin.netlify.app \n` +
-            "╚══════════════╝\n\n\n" +
-            " *Available Commands:* \n" +
-            "╔══════════════╗\n" +
-            "║ 📌 *General Commands:*       \n" +
-            "║   ✫📶 .ping                 \n" +
-            "║   ✫🚀 .start                \n" +
-            "║   ✫✏️ .change name          \n" +
-            "║   ✫📋 .menu                 \n" +
-            "║   ✫👤 .developer                \n" +
-            "║   ✫💡 .explain <command>    \n" +
-            "║   ✫😂 .joke                 \n" +
-            "║   ✫🥰 .rizz                 \n" +
-            "╚══════════════╝\n\n" +
-            "╔══════════════╗\n" +
-            "║ 💬 *Restricted Commands:*    \n" +
-            "║   ✫💬 .message <nums>       \n" +
-            "║   ✫🔁 .retry                \n" +
-            "║   ✫⚙️ .mode              \n" +
-            "╚══════════════╝\n\n" +
-            "⚡ Fast • Simple • Reliable"
-        );
         break;
 
       default:
@@ -950,10 +954,7 @@ client.on("message", async (msg) => {
             "Oops! The bot is not active yet. Kindly reply with *.start* to activate it."
           );
         } else {
-          await tagEveryone(
-            msg,
-            "❌ Unknown command. Type *.menu* to see all commands."
-          );
+          await tagEveryone(msg, aiReply);
         }
     }
   } catch (err) {

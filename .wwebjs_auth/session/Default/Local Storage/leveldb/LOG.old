@@ -1,3 +1,9 @@
-2026/01/04-23:41:53.662 671c Reusing MANIFEST C:\Users\omiri\Desktop\Coding\whatsapp-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
-2026/01/04-23:41:53.666 671c Recovering log #3
-2026/01/04-23:41:53.669 671c Reusing old log C:\Users\omiri\Desktop\Coding\whatsapp-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/000003.log 
+2026/01/05-23:07:41.443 2f28 Reusing MANIFEST C:\Users\omiri\Desktop\Coding\whatsapp-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2026/01/05-23:07:41.444 2f28 Recovering log #10
+2026/01/05-23:07:41.445 2f28 Reusing old log C:\Users\omiri\Desktop\Coding\whatsapp-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/000010.log 
+2026/01/06-04:31:25.878 2714 Level-0 table #14: started
+2026/01/06-04:31:25.925 2714 Level-0 table #14: 17103 bytes OK
+2026/01/06-04:31:25.927 2714 Delete type=0 #10
+2026/01/06-10:31:13.927 6028 Level-0 table #16: started
+2026/01/06-10:31:13.937 6028 Level-0 table #16: 16838 bytes OK
+2026/01/06-10:31:13.938 6028 Delete type=0 #13
