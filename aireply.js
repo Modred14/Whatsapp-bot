@@ -1,8 +1,7 @@
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey:
-    "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",
+  apiKey: process.env.AI_KEY,
 });
 const gpt = async (user, text) => {
   try {
@@ -26,3 +25,4 @@ const gpt = async (user, text) => {
     return "I'm having trouble thinking right now 😅";
   }
 };
+export default gpt;
