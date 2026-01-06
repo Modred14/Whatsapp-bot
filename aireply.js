@@ -1,11 +1,13 @@
+import 'dotenv/config';
 import OpenAI from "openai";
+
 
 const openai = new OpenAI({
   apiKey: process.env.AI_KEY,
 });
 const gpt = async (user, text) => {
   try {
-    const response = openai.responses.create({
+    const response = await openai.responses.create({
       model: "gpt-4o-mini",
       messages: [
         {
@@ -18,8 +20,8 @@ const gpt = async (user, text) => {
         },
       ],
     });
-    console.log(result.output_text);
-    return response;
+    console.log(response.output_text);
+    return response.output_text;
   } catch (err) {
     console.error("AI error:", err);
     return "I'm having trouble thinking right now 😅";
