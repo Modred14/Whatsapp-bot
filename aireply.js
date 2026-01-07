@@ -2,7 +2,7 @@ const OpenAI = require("openai");
 require("dotenv").config();
 
 const openai = new OpenAI({
-  
+  apiKey: process.env.AI_KEY,
 });
 const gpt = async (user, text) => {
   try {
