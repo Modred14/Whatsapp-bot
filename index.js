@@ -332,6 +332,9 @@ const client = new Client({
   },
 });
 
+client.on("loading_screen", (percent, message) =>
+  console.log(`Loading ${percent}%: ${message}`)
+);
 client.on("qr", async (qr) => {
   latestQR = qr; // store raw QR string
   qrcode.generate(qr, { small: true }); // keep terminal QR
@@ -388,6 +391,7 @@ app.get("/", async (req, res) => {
         </body>
       </html>
     `);
+    console.log("Qr generated")
   } catch (err) {
     res.status(500).send("Failed to generate QR");
   }
