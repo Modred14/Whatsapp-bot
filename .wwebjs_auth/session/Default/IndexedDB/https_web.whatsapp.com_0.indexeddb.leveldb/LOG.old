@@ -1,0 +1,27 @@
+2026/01/09-11:11:38.999 4ad8 Reusing MANIFEST C:\Users\omiri\Desktop\Coding\Whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/01/09-11:11:39.000 4ad8 Recovering log #904
+2026/01/09-11:11:39.028 4ad8 Reusing old log C:\Users\omiri\Desktop\Coding\Whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000904.log 
+2026/01/09-11:11:41.008 623c Level-0 table #916: started
+2026/01/09-11:11:41.017 623c Level-0 table #916: 350415 bytes OK
+2026/01/09-11:11:41.019 623c Delete type=0 #904
+2026/01/09-11:11:41.019 623c Manual compaction at level-0 from '\x00c\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00d\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/01/09-11:11:41.078 67d0 Compacting 1@1 + 8@2 files
+2026/01/09-11:11:41.162 67d0 Generated table #917@1: 87130 keys, 2237251 bytes
+2026/01/09-11:11:41.246 67d0 Generated table #918@1: 75900 keys, 2319300 bytes
+2026/01/09-11:11:41.278 67d0 Generated table #919@1: 26309 keys, 2188432 bytes
+2026/01/09-11:11:41.352 67d0 Generated table #920@1: 28483 keys, 2189070 bytes
+2026/01/09-11:11:41.461 67d0 Generated table #921@1: 66281 keys, 2235114 bytes
+2026/01/09-11:11:41.520 67d0 Generated table #922@1: 18808 keys, 2171081 bytes
+2026/01/09-11:11:41.577 67d0 Generated table #923@1: 28703 keys, 2186847 bytes
+2026/01/09-11:11:41.619 67d0 Generated table #924@1: 37686 keys, 1102579 bytes
+2026/01/09-11:11:41.619 67d0 Compacted 1@1 + 8@2 files => 16629674 bytes
+2026/01/09-11:11:41.620 67d0 compacted to: files[ 0 0 8 0 0 0 0 ]
+2026/01/09-11:11:41.620 67d0 Delete type=2 #906
+2026/01/09-11:11:41.620 67d0 Delete type=2 #907
+2026/01/09-11:11:41.620 67d0 Delete type=2 #908
+2026/01/09-11:11:41.620 67d0 Delete type=2 #909
+2026/01/09-11:11:41.620 67d0 Delete type=2 #910
+2026/01/09-11:11:41.620 67d0 Delete type=2 #911
+2026/01/09-11:11:41.620 67d0 Delete type=2 #912
+2026/01/09-11:11:41.620 67d0 Delete type=2 #913
+2026/01/09-11:11:41.620 67d0 Delete type=2 #916

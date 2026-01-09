@@ -63,6 +63,76 @@ function getUser(chatId) {
   return state.users[chatId];
 }
 
+const COMMANDS = [
+  {
+    com: ".ping",
+    explain:
+      "📶 Checks if the bot is online and responding. \nUse this command to see if the bot is active.",
+  },
+  {
+    com: ".start",
+    explain:
+      "👋 Initializes the bot and sets the user name if not already set. \nUse this command to set your user name.",
+  },
+  {
+    com: ".change",
+    argul: ".change name",
+    explain:
+      "✏️ Updates or changes the user name in the bot system. \nUse this command to change your user name.",
+  },
+  {
+    com: ".menu",
+    explain:
+      "📜 Displays all available commands. \nUse this command to check all available commands.",
+  },
+  {
+    com: ".developer",
+    explain:
+      "👤 Gives information about the bot developer. \nUse this command to contact the developer.",
+  },
+  {
+    com: ".explain",
+    argul: "expain <command>",
+    explain:
+      "💡 Provides explanations for each command. \nCan specify a command like *.explain <command>*.",
+  },
+  {
+    com: ".joke",
+    explain:
+      "😂 Provides a humorous joke to make you laugh. \nUse this command to hear a funny joke.",
+  },
+  {
+    com: ".rizz",
+    explain:
+      "💘 Generates smooth, funny, or charming lines you can use to impress someone.",
+  },
+  {
+    com: ".message",
+    explain:
+      "📩 Sends a message via the bot number using the user’s name.  \nOnly the bot developer can use this command.",
+    argul: ".message <nums>",
+  },
+  {
+    com: ".retry",
+    explain:
+      "🔄 Retries sending messages that failed previously. \nOnly the bot developer can use this command.",
+  },
+  {
+    com: ".mode",
+    explain:
+      "📝 Shows the current status of the bot.  \nOnly the bot developer can use this command.",
+  },
+
+  {
+    com: ".tag",
+    explain:
+      "📣 Mentions all members in a group chat.\n Use this command to tag everyone in the group so they get notified",
+  },
+  // {
+  //   com: "",
+  //   explain: "",
+  // },
+];
 // -------------------- UTILS --------------------
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -116,7 +186,10 @@ async function tagEveryone(msg, text) {
         const mentions = chat.participants
           .filter((p) => p.id.user !== client.info?.me?.user)
           .map((p) => p.id._serialized);
-        await chat.sendMessage(`${text}`, { mentions });
+        await chat.sendMessage(text || "", {
+          mentions,
+          quotedMessageId: msg.id._serialized,
+        });
       }
     },
     1000
@@ -163,6 +236,63 @@ function loadFailedQueue(user) {
 }
 
 loadFailedQueue();
+
+async function tagEveryoneOnReply(msg) {
+  const chat = await msg.getChat();
+
+  // Ensure it's a group
+  if (!chat.isGroup) {
+    await msg.reply("❌ This command only works in groups.");
+    return;
+  }
+
+  // IDs
+  const senderId = msg.author || msg.from;
+  const botId = client.info.wid._serialized;
+
+  // Find sender participant
+  const senderParticipant = chat.participants.find(
+    (p) => p.id?._serialized === senderId
+  );
+
+  if (!senderParticipant) {
+    await msg.reply(
+      "⚠️ Could not find your participant info. " +
+        "Make sure you are in the group and try again."
+    );
+    return;
+  }
+
+  // Check sender is admin
+  if (!senderParticipant.isAdmin && !senderParticipant.isSuperAdmin) {
+    await msg.reply("🚫 Only group admins can use this command.");
+    return;
+  }
+
+  // Find bot participant
+  const botParticipant = chat.participants.find(
+    (p) => p.id?._serialized === botId
+  );
+
+  if (
+    !botParticipant ||
+    (!botParticipant.isAdmin && !botParticipant.isSuperAdmin)
+  ) {
+    await msg.reply("⚠️ You need to make me an admin to use this command.");
+    return;
+  }
+
+  const quotedMsg = await msg.getQuotedMessage();
+
+  const mentions = chat.participants
+    .filter((p) => p.id.user !== client.info?.me?.user)
+    .map((p) => p.id._serialized);
+
+  await chat.sendMessage("", {
+    mentions,
+    quotedMessageId: quotedMsg.id._serialized,
+  });
+}
 
 function loadConfig() {
   if (!fs.existsSync(CONFIG_FILE)) return;
@@ -391,7 +521,7 @@ app.get("/", async (req, res) => {
         </body>
       </html>
     `);
-    console.log("Qr generated")
+    console.log("Qr generated");
   } catch (err) {
     res.status(500).send("Failed to generate QR");
   }
@@ -407,27 +537,6 @@ client.on("message", async (msg) => {
   try {
     // self-chat only
     // if (!msg.fromMe) return;
-    const isGroup = msg.from.endsWith("@g.us");
-    if (!isOwner(msg) && allMode.private) {
-      await tagEveryone(
-        msg,
-        "Oops, the bot is in private mode. Contact my developer to make it public."
-      );
-      const numberE164 = "+23279566275";
-      const waid = "23279566275"; // digits only (no +)
-
-      const vcard =
-        "BEGIN:VCARD\n" +
-        "VERSION:3.0\n" +
-        "N:Modred;Modred;;;\n" +
-        "FN:Modred\n" +
-        `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
-        `NOTE:Email: favourdomirin@gmail.com\n` +
-        "END:VCARD";
-
-      await client.sendMessage(msg.from, vcard, { parseVCards: true });
-      return;
-    }
 
     const chatId = msg.from;
     const user = getUser(chatId);
@@ -437,8 +546,50 @@ client.on("message", async (msg) => {
 
     const text = msg.body.trim();
     let cmd = text.split(" ")[0].toLowerCase();
-    if (!cmd.startsWith(".")) {
-      cmd = "." + cmd;
+    const isGroup = msg.from.endsWith("@g.us");
+    const isCommand = COMMANDS.some((c) => c.com === cmd);
+    if (isGroup) {
+      if (!isOwner(msg) && mode.currentMode === "private" && isCommand) {
+        await tagEveryone(
+          msg,
+          "Oops, the bot is in private mode. Contact my developer to make it public."
+        );
+        const numberE164 = "+23279566275";
+        const waid = "23279566275"; // digits only (no +)
+
+        const vcard =
+          "BEGIN:VCARD\n" +
+          "VERSION:3.0\n" +
+          "N:Modred;Modred;;;\n" +
+          "FN:Modred\n" +
+          `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
+          `NOTE:Email: favourdomirin@gmail.com\n` +
+          "END:VCARD";
+
+        await client.sendMessage(msg.from, vcard, { parseVCards: true });
+        return;
+      }
+    } else {
+      if (!isOwner(msg) && mode.currentMode === "private") {
+        await tagEveryone(
+          msg,
+          "Oops, the bot is in private mode. Contact my developer to make it public."
+        );
+        const numberE164 = "+23279566275";
+        const waid = "23279566275"; // digits only (no +)
+
+        const vcard =
+          "BEGIN:VCARD\n" +
+          "VERSION:3.0\n" +
+          "N:Modred;Modred;;;\n" +
+          "FN:Modred\n" +
+          `TEL;TYPE=CELL;TYPE=VOICE;waid=${waid}:${numberE164}\n` +
+          `NOTE:Email: favourdomirin@gmail.com\n` +
+          "END:VCARD";
+
+        await client.sendMessage(msg.from, vcard, { parseVCards: true });
+        return;
+      }
     }
 
     // ---------------- NAME FLOW ----------------
@@ -527,7 +678,22 @@ client.on("message", async (msg) => {
     // ---------------- COMMANDS ----------------
 
     switch (cmd) {
-      case ".start":
+      case COMMANDS[0].com:
+        {
+          const speed = await getSpeed();
+          await tagEveryone(
+            msg,
+            "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
+              `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
+              `║ ✫🚀 *Speed:* ${speed} \n` +
+              "║ ✫🖥️ *Platform:* linux         \n" +
+              `║ ✫🌟 *Version:* ${version}        \n` +
+              `║ ✫🛠️ *Developer:* Modred \n` +
+              "╚══════════════╝"
+          );
+        }
+        break;
+      case COMMANDS[1].com:
         await tagEveryone(msg, "👋 Hello World ...");
 
         if (user.USER_NAME) {
@@ -547,194 +713,52 @@ client.on("message", async (msg) => {
 
         break;
 
-      case ".change name":
-        user.USER_NAME = null;
-        user.awaitingName = true;
-        saveConfig();
-        await tagEveryone(msg, "What’s your new name?");
+      case COMMANDS[2].com:
+        let argu = text.slice(cmd.length).trim();
+        if (argu === "name") {
+          user.USER_NAME = null;
+          user.awaitingName = true;
+          saveConfig();
+          await tagEveryone(msg, "What’s your new name?");
+          break;
+        }
+
+        await tagEveryone(msg, "💡 Usage: *.change name*");
+
         break;
-
-      case ".message": {
-        if (!isOwner(msg)) {
-          await tagEveryone(
-            msg,
-            "❌Oops! Only the developer of this bot can use this command."
-          );
-          return;
-        }
-
-        const rawNumbers = text
-          .slice(cmd.length)
-          .trim()
-          .split(/[\s,]+/)
-          .filter(Boolean);
-        const normalizedResults = rawNumbers.map((n) => normalizeNumber(n));
-        const numbers = [...new Set(normalizedResults.filter(Boolean))];
-        if (!numbers.length) {
-          await tagEveryone(msg, "⚠️ No valid numbers provided.");
-          return;
-        }
-
-        if (numbers.length > MAX_PER_COMMAND) {
-          await tagEveryone(
-            msg,
-            `Unfortunately, you have a limit of ${MAX_PER_COMMAND} numbers per command.`
-          );
-          return;
-        }
-
-        if (user.messageSentToday + numbers.length > DAILY_LIMIT) {
-          await tagEveryone(
-            msg,
-            `Oops, you have reached your daily limit for today. Please try again tomorrow.`
-          );
-          return;
-        }
-
-        await tagEveryone(msg, `Sending to ${numbers.length} contacts...`);
-
-        user.pendingNumbers = numbers;
-        user.awaitingCustomConfirm = true;
-        saveConfig();
-
+      case COMMANDS[3].com:
         await tagEveryone(
           msg,
-          `📨 Preparing to send default message. Do you want to send a *custom message*?\nReply *yes* or *no*."`
+          "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
+            `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
+            `║ ✫⚙️ *Commands:* ${COMMANDS.length} \n` +
+            `║ ✫🌟 *Version:* ${version}        \n` +
+            `║ ✫🛠️ *Developer:* Modred \n` +
+            `║ ✫🌐 *Website:* https://favouromirin.netlify.app \n` +
+            "╚══════════════╝\n\n\n" +
+            " *Available Commands:* \n" +
+            "╔══════════════╗\n" +
+            "║ 📌 *General Commands:*       \n" +
+            `║   ✫📶 ${COMMANDS[0].com}                 \n` +
+            `║   ✫🚀 ${COMMANDS[1].com}                \n` +
+            `║   ✫✏️ ${COMMANDS[2].argul}          \n` +
+            `║   ✫📋 ${COMMANDS[3].com}                 \n` +
+            `║   ✫👤 ${COMMANDS[4].com}                \n` +
+            `║   ✫💡 ${COMMANDS[5].argul}   \n` +
+            `║   ✫😂 ${COMMANDS[6].com}                 \n` +
+            `║   ✫🥰 ${COMMANDS[7].com}               \n` +
+            `║   ✫📣 ${COMMANDS[11].com}               \n` +
+            "╚══════════════╝\n\n" +
+            "╔══════════════╗\n" +
+            `║ 💬 *Restricted Commands:*    \n` +
+            `║   ✫💬 ${COMMANDS[8].argul}        \n` +
+            `║   ✫🔁 ${COMMANDS[9].com}               \n` +
+            `║   ✫⚙️ ${COMMANDS[10].com}             \n` +
+            "╚══════════════╝\n\n" +
+            "⚡ Fast • Simple • Reliable"
         );
-
         break;
-      }
-      case ".retry": {
-        if (!isOwner(msg)) {
-          await tagEveryone(
-            msg,
-            "❌Oops! Only the developer of this bot can use this command."
-          );
-          return;
-        }
-        if (!failedMessages.length) {
-          await tagEveryone(msg, "No failed messages to retry.");
-          return;
-        }
-
-        await tagEveryone(
-          msg,
-          `Retrying ${failedMessages.length} failed messages...`
-        );
-        const retryQueue = [...failedMessages];
-        failedMessages.length = 0;
-
-        let sent = 0;
-        let failed = 0;
-        for (const f of retryQueue) {
-          const success = await sendToNumber(f.number, user);
-          if (success) sent++;
-          else failed++;
-          await delay(randomBetween(5000, 15000));
-        }
-
-        await tagEveryone(
-          msg,
-          `✅Retry complete.\nSent: ${sent}\nFailed: ${failed}\nTotal messages sent today: ${user.messageSentToday}/${DAILY_LIMIT}`
-        );
-
-        break;
-      }
-      case ".explain":
-        {
-          let arg = text.slice(cmd.length).trim(); // get argument after .explain
-          if (!arg) {
-            await tagEveryone(
-              msg,
-              "💡 Usage: *.explain <command>*\nExample: *.explain ping*"
-            );
-            break;
-          }
-
-          // ensure it starts with a dot
-          if (!arg.startsWith(".")) arg = "." + arg;
-
-          switch (arg.toLowerCase()) {
-            case ".ping": {
-              await tagEveryone(
-                msg,
-                "📶 Checks if the bot is online and responding. Use this command to see if the bot is active."
-              );
-              break;
-            }
-            case ".start": {
-              await tagEveryone(
-                msg,
-                "👋 Initializes the bot and sets the user name if not already set."
-              );
-              break;
-            }
-            case ".change name": {
-              await tagEveryone(
-                msg,
-                "✏️ Updates or changes the user name in the bot system."
-              );
-              break;
-            }
-            case ".menu": {
-              await tagEveryone(msg, "📜 Displays all available commands.");
-              break;
-            }
-            case ".developer": {
-              await tagEveryone(
-                msg,
-                "👤 Gives information about the bot developer. Use this command to contact the developer."
-              );
-              break;
-            }
-            case ".explain": {
-              await tagEveryone(
-                msg,
-                "💡 Provides explanations for each command. Can specify a command like *.explain <command>*."
-              );
-              break;
-            }
-            case ".joke": {
-              await tagEveryone(
-                msg,
-                "😂 Provides a humorous joke to make you laugh."
-              );
-              break;
-            }
-            case ".rizz": {
-              await tagEveryone(
-                msg,
-                "💘 Generates smooth, funny, or charming lines you can use to impress someone."
-              );
-              break;
-            }
-            case ".message": {
-              await tagEveryone(
-                msg,
-                "📩 Sends a message via the bot number using the user’s name. Can specify recipients or quantity using *.message <number>*."
-              );
-              break;
-            }
-            case ".retry": {
-              await tagEveryone(
-                msg,
-                "🔄 Retries sending messages that failed previously."
-              );
-              break;
-            }
-            case ".mode": {
-              await tagEveryone(msg, "📝 Shows the current status of the bot.");
-            }
-            default: {
-              await tagEveryone(
-                msg,
-                "❌ Unknown command. Type *.menu* to see all commands."
-              );
-            }
-          }
-        }
-        break;
-      case ".developer":
+      case COMMANDS[4].com:
         try {
           // Send info text first
           await tagEveryone(
@@ -763,23 +787,35 @@ client.on("message", async (msg) => {
           await msg.reply("⚠️ Could not send contact. Try again later.");
         }
         break;
-
-      case ".ping":
-        {
-          const speed = await getSpeed();
+      case COMMANDS[5].com: {
+        let arg = text.slice(cmd.length).trim(); // get argument after .explain
+        if (!arg) {
           await tagEveryone(
             msg,
-            "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
-              `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
-              `║ ✫🚀 *Speed:* ${speed} \n` +
-              "║ ✫🖥️ *Platform:* linux         \n" +
-              `║ ✫🌟 *Version:* ${version}        \n` +
-              `║ ✫🛠️ *Developer:* Modred \n` +
-              "╚══════════════╝"
+            "💡 Usage: *.explain <command>*\nExample: *.explain ping*"
           );
+          break;
         }
+
+        // ensure it starts with a dot
+        if (!arg.startsWith(".")) arg = "." + arg;
+
+        const isExplain = COMMANDS.find(
+          (c) => c.com.trim() === arg.toLowerCase()
+        );
+        if (isExplain) {
+          await tagEveryone(msg, isExplain.explain);
+          break;
+        }
+
+        await tagEveryone(
+          msg,
+          "❌ Unknown command. Type *.menu* to see all commands."
+        );
         break;
-      case ".joke":
+      }
+
+      case COMMANDS[6].com:
         {
           const jokes = [
             {
@@ -880,7 +916,7 @@ client.on("message", async (msg) => {
           await tagEveryone(msg, jokeMessage);
         }
         break;
-      case ".rizz":
+      case COMMANDS[7].com:
         const rizzs = [
           "🌹 Roses are red, 🌸 violets are blue 💙\nI thought God stopped creating angels until I met you 🫶😇",
           "",
@@ -889,7 +925,94 @@ client.on("message", async (msg) => {
         await tagEveryone(msg, sendRizz);
         break;
 
-      case ".mode":
+      case COMMANDS[8].com: {
+        if (!isOwner(msg)) {
+          await tagEveryone(
+            msg,
+            "❌Oops! Only the developer of this bot can use this command."
+          );
+          return;
+        }
+
+        const rawNumbers = text
+          .slice(cmd.length)
+          .trim()
+          .split(/[\s,]+/)
+          .filter(Boolean);
+        const normalizedResults = rawNumbers.map((n) => normalizeNumber(n));
+        const numbers = [...new Set(normalizedResults.filter(Boolean))];
+        if (!numbers.length) {
+          await tagEveryone(msg, "⚠️ No valid numbers provided.");
+          return;
+        }
+
+        if (numbers.length > MAX_PER_COMMAND) {
+          await tagEveryone(
+            msg,
+            `Unfortunately, you have a limit of ${MAX_PER_COMMAND} numbers per command.`
+          );
+          return;
+        }
+
+        if (user.messageSentToday + numbers.length > DAILY_LIMIT) {
+          await tagEveryone(
+            msg,
+            `Oops, you have reached your daily limit for today. Please try again tomorrow.`
+          );
+          return;
+        }
+
+        await tagEveryone(msg, `Sending to ${numbers.length} contacts...`);
+
+        user.pendingNumbers = numbers;
+        user.awaitingCustomConfirm = true;
+        saveConfig();
+
+        await tagEveryone(
+          msg,
+          `📨 Preparing to send default message. Do you want to send a *custom message*?\nReply *yes* or *no*."`
+        );
+
+        break;
+      }
+      case COMMANDS[9].com: {
+        if (!isOwner(msg)) {
+          await tagEveryone(
+            msg,
+            "❌Oops! Only the developer of this bot can use this command."
+          );
+          return;
+        }
+        if (!failedMessages.length) {
+          await tagEveryone(msg, "No failed messages to retry.");
+          return;
+        }
+
+        await tagEveryone(
+          msg,
+          `Retrying ${failedMessages.length} failed messages...`
+        );
+        const retryQueue = [...failedMessages];
+        failedMessages.length = 0;
+
+        let sent = 0;
+        let failed = 0;
+        for (const f of retryQueue) {
+          const success = await sendToNumber(f.number, user);
+          if (success) sent++;
+          else failed++;
+          await delay(randomBetween(5000, 15000));
+        }
+
+        await tagEveryone(
+          msg,
+          `✅Retry complete.\nSent: ${sent}\nFailed: ${failed}\nTotal messages sent today: ${user.messageSentToday}/${DAILY_LIMIT}`
+        );
+
+        break;
+      }
+
+      case COMMANDS[10].com:
         const [_, arg] = msg.body.trim().split(/\s+/);
         if (!isOwner(msg)) {
           await tagEveryone(
@@ -918,37 +1041,10 @@ client.on("message", async (msg) => {
         );
 
         break;
-
-      case ".menu":
-        await tagEveryone(
-          msg,
-          "╔═{🤖  *ӍØĐⱤɆĐ ɃØŦ*  🤖}═╗\n" +
-            `║ ✫⏱️ *Uptime:* ${getUptime()} \n` +
-            "║ ✫⚙️ *Commands:* 11           \n" +
-            `║ ✫🌟 *Version:* ${version}        \n` +
-            `║ ✫🛠️ *Developer:* Modred \n` +
-            `║ ✫🌐 *Website:* https://favouromirin.netlify.app \n` +
-            "╚══════════════╝\n\n\n" +
-            " *Available Commands:* \n" +
-            "╔══════════════╗\n" +
-            "║ 📌 *General Commands:*       \n" +
-            "║   ✫📶 .ping                 \n" +
-            "║   ✫🚀 .start                \n" +
-            "║   ✫✏️ .change name          \n" +
-            "║   ✫📋 .menu                 \n" +
-            "║   ✫👤 .developer                \n" +
-            "║   ✫💡 .explain <command>    \n" +
-            "║   ✫😂 .joke                 \n" +
-            "║   ✫🥰 .rizz                 \n" +
-            "╚══════════════╝\n\n" +
-            "╔══════════════╗\n" +
-            "║ 💬 *Restricted Commands:*    \n" +
-            "║   ✫💬 .message <nums>       \n" +
-            "║   ✫🔁 .retry                \n" +
-            "║   ✫⚙️ .mode              \n" +
-            "╚══════════════╝\n\n" +
-            "⚡ Fast • Simple • Reliable"
-        );
+      case COMMANDS[11].com:
+        {
+          await tagEveryoneOnReply(msg, "");
+        }
         break;
 
       default:
@@ -958,8 +1054,27 @@ client.on("message", async (msg) => {
             msg,
             "Oops! The bot is not active yet. Kindly reply with *.start* to activate it."
           );
+        }
+        if (cmd.startsWith(".")) {
+          await tagEveryone(
+            msg,
+            "❌ Unknown command. Type *.menu* to see all commands."
+          );
         } else {
-          await tagEveryone(msg, gpt);
+          const userMessage = msg.body;
+
+          const aiReply = await withTyping(
+            chat,
+            () => gpt(user.USER_NAME, userMessage),
+            1000
+          );
+          // SAFETY NET — YOU DIDN’T HAVE THIS
+          if (typeof aiReply !== "string" || !aiReply.trim()) {
+            await tagEveryone(msg, "I'm having trouble thinking right now 😅");
+            return;
+          }
+
+          await tagEveryone(msg, aiReply);
         }
     }
   } catch (err) {
